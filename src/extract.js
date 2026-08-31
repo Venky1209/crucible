@@ -103,10 +103,23 @@ function fromJson(text) {
 function fromYaml(text) {
   for (const key of PROMPT_KEYS) {
     // key: | / key: > followed by an indented block
-    const block = new RegExp(`^\\s*${key}\\s*:\\s*[|>][-+]?\\s*\\n((?:[ \\t]+.*\\n?)+)`, 'im');
+    // Allow blank lines INSIDE the block - a prompt with paragraphs would
+    // otherwise be truncated at its first empty line, silently.
+    const block = new RegExp(`^\\s*${key}\\s*:\\s*[|>][-+]?\\s*\\n((?:(?:[ \\t]+.*)?\\n)+)`, "im");
     const m = text.match(block);
     if (m) {
-      const body = m[1].replace(/^[ \t]{1,}/gm, '').trim();
+      // A YAML block ends where indentation drops below the block's own indent.
+      // Regex alone over-reads into the next sibling key, so cut it here.
+      const raw = m[1].split(/\r?\n/);
+      const first = raw.find((l) => l.trim());
+      const indent = first ? (first.match(/^[ \t]*/) || [''])[0].length : 0;
+      const kept = [];
+      for (const line of raw) {
+        if (!line.trim()) { kept.push(''); continue; }          // blank lines belong to the block
+        if ((line.match(/^[ \t]*/) || [''])[0].length < indent) break;   // sibling key - stop
+        kept.push(line.slice(indent));
+      }
+      const body = kept.join('\n').trim();
       if (body.length >= 40) return {
         kind: 'YAML config', name: (text.match(/^\s*name\s*:\s*(.+)$/im) || [])[1]?.trim() || null,
         prompt: body, confidence: 'high', note: `Read from the "${key}" block.`,
