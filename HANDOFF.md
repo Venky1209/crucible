@@ -1,8 +1,8 @@
 # Crucible — handoff
 
-Everything a second person needs that isn't obvious from reading the code: the
-research behind the decisions, the traps that already cost us hours, and an
-honest line between what is verified and what is merely written.
+Working notes: the research behind the decisions, the traps that already cost
+hours, and an honest line between what is verified and what is merely written.
+Kept because none of it is recoverable from the code alone.
 
 Built for The Great Agent Hackathon (Track 3 — AI-Native Enterprise).
 
@@ -143,9 +143,18 @@ What still holds, and is defensible:
 
 1. **GPT-5.6 Sol is 85.1%** — one conversation in seven still goes wrong on
    policy. Nobody ships a refund flow at a 15% error rate.
-2. **Nobody deploys those models on a support queue.** Support is high-volume
-   and margin-sensitive, so it runs on gpt-4o-mini, Haiku and Sonnet-class
-   models. The leaderboard measures models that are not on the refund desk.
+2. **Nobody deploys those models on a support queue** — verified, not assumed.
+   Industry reporting for 2026: "Claude Haiku 4.5, Gemini 3.5 Flash, and GPT-5.4
+   Mini handle the bulk of customer support bots"; "low-cost LLMs have become the
+   default choice for many production AI workloads". The economics force it -
+   support is priced per resolution at roughly $0.50-$2.00 (Intercom Fin $0.99,
+   Zendesk ~$1.50, Agentforce $2.00), which cannot carry a $10/$50-per-Mtok
+   model. So the leaderboard's top entries are not the models on the refund desk.
+
+   **Honest gap: there are no published tau2-bench scores for the budget tier.**
+   Do not claim Haiku scores badly - that number was not found. The defensible
+   statement is narrower: the published scores measure models that are not
+   deployed for this, and the deployed tier is unmeasured.
 3. **The leaderboard warns against flat comparison** — its own words: match the
    domain, scaffold, prompts, trial count and pass^k before comparing. The
    pass^k value is not uniformly defined, and the older finding was that GPT-4o
