@@ -9,6 +9,7 @@ import { STYLES, PLATFORMS, parseHeaders, validateUrl, probeEndpoint } from './s
 import { voiceReady, renderTranscript } from './src/voice.js';
 import { voiceModeReady, voiceModeStatus } from './src/voice-target.js';
 import { extractBest } from './src/extract.js';
+import { DETAIL } from './src/detail.js';
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
@@ -26,7 +27,7 @@ const runs = new Map();
 app.get('/api/config', (_req, res) => {
   res.json({
     library: LIBRARY.map(({ id, name, blurb, goal, color, icon, tagline, principle, source }) =>
-      ({ id, name, blurb, goal, color, icon, tagline, principle, source })),
+      ({ id, name, blurb, goal, color, icon, tagline, principle, source, ...(DETAIL[id] || {}) })),
     defaultActive: ADVERSARIES.map((a) => a.id),
     defaultPrompt: DEFAULT_TARGET_PROMPT,
     targets: TARGETS,

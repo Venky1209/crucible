@@ -281,8 +281,16 @@
   .rosterwrap{position:relative}
   .roster.rail-carousel{flex-direction:row;overflow-x:auto;overflow-y:hidden;
     scroll-snap-type:x mandatory;gap:9px;padding:10px 12px 14px}
-  .roster.rail-carousel .ag{flex:0 0 176px;flex-direction:column;align-items:flex-start;
-    scroll-snap-align:start;padding:12px;gap:9px;min-height:118px}
+  .roster.rail-carousel .ag{flex:0 0 216px;flex-direction:column;align-items:flex-start;
+    scroll-snap-align:start;padding:14px;gap:11px;min-height:150px}
+  .roster.rail-carousel .glyph{width:38px;height:38px}
+  .roster.rail-carousel .glyph.gl{width:42px;height:42px}
+  .ag-b2{font-size:12px;color:var(--dim);line-height:1.45;margin-top:2px}
+  .impact{font:9px/1 var(--mono);font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+          padding:4px 6px;border-radius:4px;align-self:flex-start}
+  .impact.critical{background:var(--alarm);color:#fff}
+  .impact.high{background:#f2d9cf;color:var(--clay-deep)}
+  .impact.medium{background:var(--line);color:var(--dim)}
   .roster.rail-carousel .ag-n{font-size:13.5px}
   .roster.rail-carousel .ag-p{font-size:9px;line-height:1.35}
   .cbtn{position:absolute;top:50%;transform:translateY(-50%);z-index:8;
@@ -291,6 +299,41 @@
         display:grid;place-items:center;font-size:13px;padding:0}
   .cbtn:hover{background:var(--paper)}
   .cbtn.prev{left:4px} .cbtn.next{right:4px}
+  /* ── roster modal ──────────────────────────────────────────────────── */
+  .scrim{position:fixed;inset:0;background:rgba(26,23,20,.55);backdrop-filter:blur(3px);
+         z-index:80;display:none;align-items:center;justify-content:center;padding:24px}
+  .scrim.on{display:flex}
+  .modal{background:var(--card);border-radius:16px;width:min(1080px,100%);
+         max-height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;
+         box-shadow:0 24px 70px -20px rgba(26,23,20,.5)}
+  .m-h{display:flex;align-items:baseline;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .m-h h2{margin:0;font:400 24px/1.1 var(--display)}
+  .m-h span{font-size:13px;color:var(--dim)}
+  .m-x{margin-left:auto;background:transparent;color:var(--dim);font-size:22px;
+       width:32px;height:32px;border-radius:8px;line-height:1}
+  .m-x:hover{background:var(--paper);color:var(--ink)}
+  .m-body{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:0;flex:1}
+  .m-list{overflow-y:auto;border-right:1px solid var(--line);padding:10px}
+  .m-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;
+          cursor:pointer;width:100%;text-align:left;background:transparent;
+          border:1.5px solid transparent;color:var(--ink)}
+  .m-item:hover{background:var(--paper)}
+  .m-item.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,var(--card))}
+  .m-item .tick{margin-left:auto;font-size:13px;color:var(--pass);opacity:0}
+  .m-item.picked .tick{opacity:1}
+  .m-detail{overflow-y:auto;padding:22px 24px}
+  .d-h{display:flex;align-items:center;gap:12px;margin-bottom:5px}
+  .d-h h3{margin:0;font-size:21px;font-weight:700}
+  .d-tag{font-size:13px;color:var(--dim);margin-bottom:16px}
+  .d-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .d-chip{font:11px/1 var(--mono);background:var(--paper);border:1px solid var(--line);
+          padding:6px 10px;border-radius:6px;color:var(--dim)}
+  .d-sec{margin-bottom:16px}
+  .d-sec h4{margin:0 0 5px;font:10px/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;
+            color:var(--faint);font-weight:800}
+  .d-sec p{margin:0;font-size:14.5px;line-height:1.6;color:var(--ink2);max-width:70ch}
+  .d-add{margin-top:6px}
+  .m-f{padding:13px 22px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .facts{display:flex;flex-direction:column;gap:8px}
   .fact{display:flex;justify-content:space-between;font-size:13px}
   .fact span{color:var(--dim)} .fact b{font:12.5px/1 var(--mono);font-weight:700}
@@ -318,6 +361,21 @@
   <div class="board" id="board"></div>
   <button class="btn ghost sm" id="stop" style="display:none">Stop</button>
 </header>
+
+<div class="scrim" id="scrim">
+  <div class="modal" role="dialog" aria-label="Attack library">
+    <div class="m-h"><h2>Attack library</h2>
+      <span id="m-count"></span>
+      <button class="m-x" id="m-close" aria-label="close">&times;</button></div>
+    <div class="m-body">
+      <div class="m-list" id="m-list"></div>
+      <div class="m-detail" id="m-detail"></div>
+    </div>
+    <div class="m-f"><span class="status" id="m-status" style="margin:0"></span>
+      <div class="sp"></div>
+      <button class="btn ghost sm" id="m-done">Done</button></div>
+  </div>
+</div>
 
 <div class="wrap">
   <main>
@@ -493,8 +551,18 @@ async function boot(){
     <label class="ag ${CFG.defaultActive.includes(a.id)?'on':''}" style="--c:${a.color}" title="${esc(a.blurb)}">
       <input type="checkbox" value="${a.id}" ${CFG.defaultActive.includes(a.id)?'checked':''}>
       ${glyph(a)}
-      <span><span class="ag-n">${esc(a.name)}</span><span class="ag-p">${esc(a.principle||'')}</span></span>
-    </label>`).join('');
+      <span style="width:100%">
+        <span class="ag-n">${esc(a.name)}</span>
+        <span class="ag-p">${esc(a.principle||'')}</span>
+        <span class="ag-b2">${esc(a.tagline||'')}</span>
+      </span>
+      ${a.impact?`<span class="impact ${a.impact}">${a.impact}</span>`:''}
+    </label>`).join('') +
+    `<button class="ag" id="moretile" style="--c:var(--clay);justify-content:center;
+       align-items:center;text-align:center;background:var(--paper);border-style:dashed">
+       <span class="ag-n" style="color:var(--clay)">Browse all ${CFG.library.length}</span>
+       <span class="ag-b2">See what each attack does, why it works, and how often it happens</span>
+     </button>`;
   $('#roster').addEventListener('change', e => {
     const row = e.target.closest('.ag');
     row.classList.toggle('on', e.target.checked);
@@ -502,6 +570,7 @@ async function boot(){
     profile();
   });
 
+  $('#moretile').addEventListener('click', () => openLibrary(0));
   mountCarousel();
   if (HAS_GL){
     mountRosterAvatars();
@@ -567,6 +636,73 @@ function mountPlatforms(){
     syncNow();
   };
 }
+
+// ── attack library modal ─────────────────────────────────────────────────────
+// The carousel is for picking quickly. This is for understanding what you are
+// picking: mechanism, the psychology behind it, where it shows up in the wild,
+// and how often - which is what someone has to know before acting on a finding.
+let mSel = 0;
+
+function openLibrary(i){
+  mSel = typeof i === 'number' ? i : 0;
+  renderLibrary();
+  $('#scrim').classList.add('on');
+  document.addEventListener('keydown', escClose);
+}
+function closeLibrary(){
+  $('#scrim').classList.remove('on');
+  document.removeEventListener('keydown', escClose);
+}
+const escClose = e => { if (e.key === 'Escape') closeLibrary(); };
+
+function renderLibrary(){
+  const lib = CFG.library;
+  const on = new Set(picked());
+  $('#m-count').textContent = `${lib.length} strategies · ${on.size} selected`;
+
+  $('#m-list').innerHTML = lib.map((a,i)=>`
+    <button class="m-item ${i===mSel?'sel':''} ${on.has(a.id)?'picked':''}"
+            style="--c:${a.color}" data-i="${i}">
+      ${glyph(a)}
+      <span><span class="ag-n">${esc(a.name)}</span>
+            <span class="ag-p">${esc(a.principle||'')}</span></span>
+      <span class="tick">&#10003;</span>
+    </button>`).join('');
+
+  const a = lib[mSel];
+  const isOn = on.has(a.id);
+  $('#m-detail').innerHTML = `
+    <div class="d-h">${glyph(a)}<h3>${esc(a.name)}</h3>
+      ${a.impact?`<span class="impact ${a.impact}">${a.impact} impact</span>`:''}</div>
+    <div class="d-tag">${esc(a.tagline||'')}</div>
+    <div class="d-meta">
+      <span class="d-chip">${esc(a.principle||'')}</span>
+      ${a.source?`<span class="d-chip">${esc(a.source)}</span>`:''}
+      ${a.frequency?`<span class="d-chip">seen: ${esc(a.frequency)}</span>`:''}
+    </div>
+    <div class="d-sec"><h4>What it does</h4><p>${esc(a.how||a.blurb||'')}</p></div>
+    <div class="d-sec"><h4>Why it works</h4><p>${esc(a.why||'')}</p></div>
+    <div class="d-sec"><h4>Where it shows up</h4><p>${esc(a.seenIn||'')}</p></div>
+    <div class="d-sec"><h4>What it is trying to get</h4><p>${esc(a.goal||'')}</p></div>
+    <div class="d-add">
+      <button class="btn ${isOn?'ghost':'ap'} sm" id="m-toggle">
+        ${isOn?'Remove from attack team':'Add to attack team'}</button></div>`;
+
+  $('#m-list').querySelectorAll('.m-item').forEach(b =>
+    b.addEventListener('click', () => { mSel = +b.dataset.i; renderLibrary(); }));
+  $('#m-toggle').addEventListener('click', () => {
+    const box = [...document.querySelectorAll('#roster input')].find(x => x.value === a.id);
+    if (!box) return;
+    box.checked = !box.checked;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    renderLibrary();
+  });
+  $('#m-status').textContent = on.size ? '' : 'Pick at least one attacker.';
+}
+
+$('#m-close').addEventListener('click', closeLibrary);
+$('#m-done').addEventListener('click', closeLibrary);
+$('#scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeLibrary(); });
 
 // ── attack team carousel ─────────────────────────────────────────────────────
 // A 14-item vertical list buries most of the team. Horizontal keeps them all one
