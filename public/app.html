@@ -278,6 +278,12 @@
                        display:block;padding-left:18px}
   .verify-in{padding:0 14px 14px}
   /* ── attack team as a carousel ─────────────────────────────────────── */
+  .teamcard{margin-bottom:14px;padding-bottom:4px}
+  .team-h{display:flex;align-items:center;gap:10px;padding:14px 16px 4px}
+  .team-h h2{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.1em;
+             text-transform:uppercase;color:var(--dim)}
+  .team-h #picked{color:var(--faint);font-weight:600;letter-spacing:0;text-transform:none;
+                  font-size:12px}
   .rosterwrap{position:relative}
   .roster.rail-carousel{flex-direction:row;overflow-x:auto;overflow-y:hidden;
     scroll-snap-type:x mandatory;gap:9px;padding:10px 12px 14px}
@@ -457,6 +463,19 @@
       </div>
     </section>
 
+    <section class="card teamcard" style="position:relative">
+      <div class="team-h">
+        <h2>Attack team <span id="picked"></span></h2>
+        <div class="sp"></div>
+        <button class="btn ghost sm" id="browseall">Browse all 14</button>
+      </div>
+      <div class="rosterwrap">
+        <button class="cbtn prev" id="cprev" aria-label="previous">&#8249;</button>
+        <div class="roster rail-carousel" id="roster"></div>
+        <button class="cbtn next" id="cnext" aria-label="next">&#8250;</button>
+      </div>
+    </section>
+
     <section class="stage" id="stage">
       <div class="stage-h"><h2>Live attack</h2><div class="chip" id="livechip">idle</div></div>
       <div class="cols" id="cols"></div>
@@ -471,14 +490,6 @@
   </main>
 
   <aside class="rail">
-    <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;position:relative">
-      <h2>Attack team <span id="picked" style="color:var(--faint);font-weight:600"></span></h2>
-      <div class="rosterwrap">
-        <button class="cbtn prev" id="cprev" aria-label="previous">&#8249;</button>
-        <div class="roster rail-carousel" id="roster"></div>
-        <button class="cbtn next" id="cnext" aria-label="next">&#8250;</button>
-      </div>
-    </div>
     <div class="card"><div class="pad">
       <div class="facts">
         <div class="fact"><span>Attackers</span><b id="f-a">2</b></div>
@@ -570,7 +581,8 @@ async function boot(){
     profile();
   });
 
-  $('#moretile').addEventListener('click', () => openLibrary(0));
+  $('#moretile')?.addEventListener('click', () => openLibrary(0));
+  $('#browseall')?.addEventListener('click', () => openLibrary(0));
   mountCarousel();
   if (HAS_GL){
     mountRosterAvatars();
