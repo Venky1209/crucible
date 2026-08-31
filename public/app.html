@@ -124,6 +124,22 @@
   .f-note{font-size:12.5px;color:var(--dim);line-height:1.5}
   .f-alts{margin-top:9px;font-size:12px;color:var(--faint)}
   .f-alts b{font-weight:600;color:var(--dim)}
+  .row{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:10px}
+  .rowlab{font:10px/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;
+          color:var(--faint);font-weight:800;width:104px;flex:none}
+  .rowhint{font-size:12px;color:var(--faint)}
+  .chiprow{display:flex;gap:6px;flex-wrap:wrap}
+  .tchip{font-size:13px;font-weight:600;padding:8px 13px;border-radius:9px;
+         border:1.5px solid var(--line);background:var(--card);color:var(--ink2);
+         display:inline-flex;align-items:center;gap:7px;transition:.14s}
+  .tchip:hover{border-color:var(--line2);color:var(--ink)}
+  .tchip.on{border-color:var(--clay);background:var(--clay-soft);color:var(--clay-deep)}
+  .tchip .bm{font:8.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+             background:var(--ink);color:var(--card);padding:3px 5px;border-radius:3px}
+  .tchip.on .bm{background:var(--clay-deep)}
+  .btn.up{flex:none}
+  .tnote{margin:2px 0 12px;font-size:13px;color:var(--dim);max-width:74ch}
+  .drop.over{border-color:var(--clay)}
   .hint{margin:0 0 10px;font-size:13px;color:var(--faint)}
   textarea{width:100%;height:190px;background:var(--card);color:var(--ink);
            border:1px solid var(--line);border-radius:9px;padding:12px;
@@ -298,13 +314,16 @@
   .impact.high{background:#f2d9cf;color:var(--clay-deep)}
   .impact.medium{background:var(--line);color:var(--dim)}
   .roster.rail-carousel .ag-n{font-size:13.5px}
-  .roster.rail-carousel .ag-p{font-size:9px;line-height:1.35}
-  .cbtn{position:absolute;top:50%;transform:translateY(-50%);z-index:8;
+  .roster.rail-carousel .ag-p{font-size:9px;line-height:1.35;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .roster.rail-carousel .ag-b2{display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .cbtn{position:absolute;top:-38px;z-index:8;
         width:28px;height:28px;border-radius:50%;background:var(--card);
         border:1px solid var(--line2);box-shadow:var(--shadow);color:var(--ink);
         display:grid;place-items:center;font-size:13px;padding:0}
   .cbtn:hover{background:var(--paper)}
-  .cbtn.prev{left:4px} .cbtn.next{right:4px}
+  .cbtn.prev{right:120px} .cbtn.next{right:86px}
   /* ── roster modal ──────────────────────────────────────────────────── */
   .scrim{position:fixed;inset:0;background:rgba(26,23,20,.55);backdrop-filter:blur(3px);
          z-index:80;display:none;align-items:center;justify-content:center;padding:24px}
@@ -400,23 +419,19 @@
         </div>
 
         <div id="pane-prompt">
-          <div class="drop" id="drop">
+          <div class="row">
+            <span class="rowlab">Your agent</span>
+            <div class="chiprow" id="targets"></div>
+            <button class="btn ghost sm up" id="browse">&uarr; Upload</button>
             <input type="file" id="filein" multiple hidden>
-            <svg viewBox="0 0 24 24" class="drop-i"><path d="M12 16V4m0 0L8 8m4-4l4 4"/>
-              <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-            <div class="drop-t"><b>Drop your agent here</b>
-              <span>Assistant JSON, Dify or Flowise export, a .md prompt, or a source
-                file &mdash; we find the definition. Or a whole folder.</span></div>
-            <button class="btn ghost sm" id="browse">Choose files</button>
           </div>
+          <div class="row">
+            <span class="rowlab">Verify against</span>
+            <div class="chiprow" id="benchmarks"></div>
+            <span class="rowhint">published policies, to prove the tool isn't guessing</span>
+          </div>
+          <p class="tnote" id="t-note"></p>
           <div class="found" id="found"></div>
-          <div class="targets" id="targets"></div>
-          <details class="verify" id="verify">
-            <summary><b>Verify against published benchmarks</b>
-              <span>Prove the tool isn't just guessing &mdash; run the same attackers
-                at a policy written by benchmark researchers.</span></summary>
-            <div class="verify-in"><div class="targets" id="benchmarks"></div></div>
-          </details>
           <details class="promptbox" id="promptbox">
             <summary id="prompt-sum">View / edit prompt</summary>
             <div class="inner">
@@ -481,7 +496,7 @@
       <div class="cols" id="cols"></div>
       <div class="idle-note" id="idle">
         <b>Nothing running yet.</b>
-        Pick your attackers on the right and press Attack. Each one holds a real
+        Pick your attackers above and press Attack. Each one holds a real
         multi-turn conversation with your agent, live.
       </div>
     </section>
@@ -540,14 +555,13 @@ async function boot(){
   $('#f-model').textContent = (CFG.provider||'').split(' @ ')[0].replace(/^openai - /,'');
 
   const card = (t,i) => `
-    <button class="tgt ${i===0?'on':''}" data-i="${i}">
-      <b>${esc(t.name)}${t.benchmark?'<span class="badge">benchmark</span>':''}</b>
-      <p>${esc(t.note)}</p></button>`;
+    <button class="tchip ${i===0?'on':''}" data-i="${i}" title="${esc(t.note)}">
+      ${esc(t.name)}${t.benchmark?'<span class="bm">bench</span>':''}</button>`;
   const mine = (CFG.targets||[]).map((t,i)=>({t,i})).filter(x=>!x.t.benchmark);
   const bench = (CFG.targets||[]).map((t,i)=>({t,i})).filter(x=>x.t.benchmark);
   $('#targets').innerHTML = mine.map(x=>card(x.t,x.i)).join('');
   $('#benchmarks').innerHTML = bench.map(x=>card(x.t,x.i)).join('');
-  const onPick = e => { const b=e.target.closest('.tgt'); if(b) pickTarget(+b.dataset.i); };
+  const onPick = e => { const b=e.target.closest('.tchip'); if(b) pickTarget(+b.dataset.i); };
   $('#targets').onclick = onPick;
   $('#benchmarks').onclick = onPick;
   if (CFG.targets?.length) pickTarget(0);
@@ -757,12 +771,12 @@ function pickTarget(i){
   baselinePrompt = null; round = 0; lastFailed = null;   // new target, new arc
   const t = CFG.targets[i];
   $('#prompt').value = t.prompt;
+  $('#t-note').textContent = t.note;
   $('#prompt-sum').textContent = `View / edit prompt · ${t.prompt.length.toLocaleString()} characters`;
   const a = $('#t-src');
   if (t.source){ a.href=t.source; a.textContent='source: '+t.source.replace('https://',''); a.style.display=''; }
   else a.style.display='none';
-  document.querySelectorAll('.tgt').forEach(b=>b.classList.toggle('on', +b.dataset.i===i));
-  if (t.benchmark) $('#verify').open = true;   // show what it is being checked against
+  document.querySelectorAll('.tchip').forEach(b=>b.classList.toggle('on', +b.dataset.i===i));
   syncNow();
 }
 const picked = () => [...document.querySelectorAll('#roster input:checked')].map(i=>i.value);
@@ -929,6 +943,61 @@ async function hear(btn){
     await audioEl.play();
   }catch(err){ btn.textContent=err.message.slice(0,60); btn.disabled=false; }
 }
+
+// ── agent upload ─────────────────────────────────────────────────────────────
+// A textarea assumes you know where your prompt lives. Most people have an
+// Assistant export, a Dify yml, or a prompt buried in source. Take the file.
+const READABLE = /\.(json|ya?ml|md|markdown|txt|prompt|py|js|ts|mjs|tsx|jsx|rb|go|java)$/i;
+
+async function ingest(fileList){
+  const files = [...fileList].filter(f => f.size < 2000000 && READABLE.test(f.name)).slice(0, 60);
+  if (!files.length) return showFound({ found:false, reason:'No readable config or prompt files in that drop.' });
+  showFound({ pending:true, count:files.length });
+  const payload = await Promise.all(files.map(async f => ({ name:f.name, text: await f.text() })));
+  try{
+    const r = await fetch('/api/extract', { method:'POST',
+      headers:{'content-type':'application/json'}, body: JSON.stringify({ files: payload }) });
+    const d = await r.json();
+    showFound(d);
+    if (d.found){
+      $('#prompt').value = d.prompt;
+      $('#prompt-sum').textContent = 'View / edit prompt · ' + d.chars.toLocaleString() + ' characters';
+      $('#t-note').textContent = d.note || '';
+      document.querySelectorAll('.tchip').forEach(b=>b.classList.remove('on'));
+      tIdx = -1;
+      $('#setup-now').textContent = d.filename;
+      baselinePrompt = null; round = 0; lastFailed = null;
+      if (d.confidence !== 'high') $('#promptbox').open = true;
+    }
+  }catch(e){ showFound({ found:false, reason:e.message }); }
+}
+
+function showFound(d){
+  const el = $('#found');
+  el.className = 'found on' + (d.found === false ? ' bad' : '');
+  if (d.pending){ el.innerHTML = '<div class="f-note">Reading ' + d.count + ' file(s)...</div>'; return; }
+  if (!d.found){ el.innerHTML = '<div class="f-note">' + esc(d.reason||'Nothing found.') + '</div>'; return; }
+  el.innerHTML =
+    '<div class="f-top"><span class="f-kind">' + esc(d.kind) + '</span>' +
+    '<span class="conf ' + d.confidence + '">' + d.confidence + ' confidence</span>' +
+    '<span class="f-meta">' + esc(d.filename) + ' · ' + d.chars.toLocaleString() + ' chars</span>' +
+    (d.name ? '<span class="f-meta">@ ' + esc(d.name) + '</span>' : '') + '</div>' +
+    '<div class="f-note">' + esc(d.note||'') + '</div>' +
+    (d.alternatives && d.alternatives.length
+      ? '<div class="f-alts"><b>Also found:</b> ' +
+        d.alternatives.map(a => esc(a.filename) + ' (' + a.kind.toLowerCase() + ')').join(', ') + '</div>'
+      : '');
+}
+
+const dropZone = $('#pane-prompt');
+$('#browse').addEventListener('click', () => $('#filein').click());
+$('#filein').addEventListener('change', e => ingest(e.target.files));
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.remove('over'); }));
+dropZone.addEventListener('drop', e => {
+  if (e.dataTransfer && e.dataTransfer.files.length) ingest(e.dataTransfer.files); });
 
 function targetPayload(){
   if (mode==='voice') return { mode:'voice', url:$('#v-url').value.trim(),

@@ -99,7 +99,7 @@ GENERAL
 export const TARGETS = [
   {
     id: 'northwind',
-    name: 'Northwind Audio (typical)',
+    name: 'Northwind Audio',
     note: 'An ordinary support prompt of the kind companies actually write - helpful, eager to please, no explicit identity rule.',
     source: null,
     prompt: DEFAULT_TARGET_PROMPT,
