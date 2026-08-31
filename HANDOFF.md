@@ -123,6 +123,49 @@ level, so extra keys don't help.
 - **[MITRE ATLAS v5.4.0](https://atlas.mitre.org/)** (Feb 2026) — 16 tactics, 84 techniques.
 - **[τ-bench / tau2-bench](https://sierra.ai/blog/benchmarking-ai-agents)** (Sierra Research) — scores policy adherence *separately* from task success: an agent that resolves the request by violating policy is a partial fail. That is Crucible's thesis, from the benchmark Anthropic reports against.
 
+### Do not claim frontier models are bad at this — check the date
+
+τ²-bench scores moved fast and an out-of-date number will be checked. As of the
+**28 Aug 2026** leaderboard:
+
+| Model | τ²-bench |
+|---|---|
+| GLM-5.2 | 99.1% |
+| Claude Fable 5 | 98.5% |
+| Gemini 3.1 Pro | 95.6% |
+| Claude Opus 4.8 | 94.4% |
+| GPT-5.6 Sol | 85.1% |
+
+Earlier generations (Opus 4.5, GPT-5.2) sat at 62.9–70.2%, and "no frontier
+model exceeds 71%" was true then. **It is not true now.** Do not use it.
+
+What still holds, and is defensible:
+
+1. **GPT-5.6 Sol is 85.1%** — one conversation in seven still goes wrong on
+   policy. Nobody ships a refund flow at a 15% error rate.
+2. **Nobody deploys those models on a support queue.** Support is high-volume
+   and margin-sensitive, so it runs on gpt-4o-mini, Haiku and Sonnet-class
+   models. The leaderboard measures models that are not on the refund desk.
+3. **The leaderboard warns against flat comparison** — its own words: match the
+   domain, scaffold, prompts, trial count and pass^k before comparing. The
+   pass^k value is not uniformly defined, and the older finding was that GPT-4o
+   fell from ~60% at pass^1 to ~25% at pass^8. A pass^1 score says nothing about
+   consistency, which is what production needs.
+4. **Every one of those numbers is a COOPERATIVE user.** τ²-bench's simulator has
+   an honest goal. Nobody has published what happens when the user is trying to
+   get something.
+
+That last point is the pitch, and it is stronger than the old one:
+
+> "Frontier models have largely closed the gap on cooperative users — the best
+> are near 99%. Nobody has measured what happens when the user is *trying* to get
+> something. That number does not exist. We built the tool that produces it."
+
+An unsolved-but-unmeasured problem beats a solved-badly one. And the legal
+exposure is unchanged: *Moffatt v. Air Canada* (BC Civil Resolution Tribunal,
+Feb 2024) held the airline liable for a policy its chatbot invented, after it
+argued the bot was "a separate legal entity". Precedent does not expire.
+
 ### Why persuasion, not jailbreaks
 
 **[PNAS](https://www.pnas.org/doi/10.1073/pnas.2535868123)** — across ~126,000
