@@ -8,9 +8,10 @@ import { providerLabel, limits } from './src/llm.js';
 import { STYLES, PLATFORMS, parseHeaders, validateUrl, probeEndpoint } from './src/endpoint.js';
 import { voiceReady, renderTranscript } from './src/voice.js';
 import { voiceModeReady, voiceModeStatus } from './src/voice-target.js';
+import { extractBest } from './src/extract.js';
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '8mb' }));
 // No caching in dev. A stale avatar.js whose exports have changed breaks the
 // module import and blanks the whole page - a confusing failure to debug.
 app.use(express.static('public', {
@@ -75,6 +76,17 @@ function buildTarget(body) {
   if (!targetPrompt?.trim()) throw new Error('targetPrompt is required');
   return { mode: 'prompt', prompt: targetPrompt };
 }
+
+/** Find the agent definition in whatever the user dropped in. */
+app.post('/api/extract', (req, res) => {
+  const files = Array.isArray(req.body?.files) ? req.body.files : [];
+  if (!files.length) return res.status(400).json({ found: false, reason: 'No files received.' });
+  try {
+    res.json(extractBest(files.filter((f) => f && typeof f.text === 'string')));
+  } catch (err) {
+    res.status(400).json({ found: false, reason: err.message });
+  }
+});
 
 /** Render one attack transcript as audio. Absent unless ELEVENLABS_API_KEY is set. */
 app.post('/api/voice', async (req, res) => {
