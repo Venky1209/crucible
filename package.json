@@ -1,0 +1,19 @@
+{
+  "name": "crucible",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Adversarial proving ground for AI agents - find where they break before your customers do.",
+  "scripts": {
+    "models": "node --env-file=.env src/models.js",
+    "smoke": "node --env-file=.env src/smoke.js",
+    "dev": "node --env-file=.env server.js",
+    "mock": "node --env-file=.env mock-agent.js",
+    "mock:voice": "node --env-file=.env mock-voice-agent.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.3.0",
+    "three": "^0.185.1"
+  }
+}
