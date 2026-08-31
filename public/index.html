@@ -266,6 +266,31 @@
   .glyph.gl svg{opacity:0}
   .ag-n{font-size:13.5px;font-weight:600;line-height:1.25;display:block}
   .ag-p{font:9.5px/1.3 var(--mono);color:var(--faint);margin-top:2px;display:block}
+  .verify{border:1px solid var(--line);border-radius:11px;background:var(--paper);
+          margin-bottom:12px;overflow:hidden}
+  .verify summary{cursor:pointer;padding:12px 14px;list-style:none;display:block}
+  .verify summary::-webkit-details-marker{display:none}
+  .verify summary b{display:block;font-size:13.5px;font-weight:650;margin-bottom:2px}
+  .verify summary b::before{content:'B8';color:var(--faint);font-size:10px;
+                            margin-right:8px;display:inline-block;transition:.2s}
+  .verify[open] summary b::before{transform:rotate(90deg)}
+  .verify summary span{font-size:12.5px;color:var(--dim);line-height:1.45;
+                       display:block;padding-left:18px}
+  .verify-in{padding:0 14px 14px}
+  /* ── attack team as a carousel ─────────────────────────────────────── */
+  .rosterwrap{position:relative}
+  .roster.rail-carousel{flex-direction:row;overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;gap:9px;padding:10px 12px 14px}
+  .roster.rail-carousel .ag{flex:0 0 176px;flex-direction:column;align-items:flex-start;
+    scroll-snap-align:start;padding:12px;gap:9px;min-height:118px}
+  .roster.rail-carousel .ag-n{font-size:13.5px}
+  .roster.rail-carousel .ag-p{font-size:9px;line-height:1.35}
+  .cbtn{position:absolute;top:50%;transform:translateY(-50%);z-index:8;
+        width:28px;height:28px;border-radius:50%;background:var(--card);
+        border:1px solid var(--line2);box-shadow:var(--shadow);color:var(--ink);
+        display:grid;place-items:center;font-size:13px;padding:0}
+  .cbtn:hover{background:var(--paper)}
+  .cbtn.prev{left:4px} .cbtn.next{right:4px}
   .facts{display:flex;flex-direction:column;gap:8px}
   .fact{display:flex;justify-content:space-between;font-size:13px}
   .fact span{color:var(--dim)} .fact b{font:12.5px/1 var(--mono);font-weight:700}
@@ -322,6 +347,12 @@
           </div>
           <div class="found" id="found"></div>
           <div class="targets" id="targets"></div>
+          <details class="verify" id="verify">
+            <summary><b>Verify against published benchmarks</b>
+              <span>Prove the tool isn't just guessing &mdash; run the same attackers
+                at a policy written by benchmark researchers.</span></summary>
+            <div class="verify-in"><div class="targets" id="benchmarks"></div></div>
+          </details>
           <details class="promptbox" id="promptbox">
             <summary id="prompt-sum">View / edit prompt</summary>
             <div class="inner">
@@ -384,7 +415,11 @@
   <aside class="rail">
     <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;position:relative">
       <h2>Attack team <span id="picked" style="color:var(--faint);font-weight:600"></span></h2>
-      <div class="roster" id="roster"></div>
+      <div class="rosterwrap">
+        <button class="cbtn prev" id="cprev" aria-label="previous">&#8249;</button>
+        <div class="roster rail-carousel" id="roster"></div>
+        <button class="cbtn next" id="cnext" aria-label="next">&#8250;</button>
+      </div>
     </div>
     <div class="card"><div class="pad">
       <div class="facts">
@@ -435,11 +470,17 @@ async function boot(){
   CFG = await (await fetch('/api/config')).json();
   $('#f-model').textContent = (CFG.provider||'').split(' @ ')[0].replace(/^openai - /,'');
 
-  $('#targets').innerHTML = (CFG.targets||[]).map((t,i)=>`
-    <button class="tgt ${i?'':'on'}" data-i="${i}">
-      <b>${esc(t.name.replace(/\s*\(.*\)$/,''))}${t.source?'<span class="badge">benchmark</span>':''}</b>
-      <p>${esc(t.note)}</p></button>`).join('');
-  $('#targets').onclick = e => { const b=e.target.closest('.tgt'); if(b) pickTarget(+b.dataset.i); };
+  const card = (t,i) => `
+    <button class="tgt ${i===0?'on':''}" data-i="${i}">
+      <b>${esc(t.name)}${t.benchmark?'<span class="badge">benchmark</span>':''}</b>
+      <p>${esc(t.note)}</p></button>`;
+  const mine = (CFG.targets||[]).map((t,i)=>({t,i})).filter(x=>!x.t.benchmark);
+  const bench = (CFG.targets||[]).map((t,i)=>({t,i})).filter(x=>x.t.benchmark);
+  $('#targets').innerHTML = mine.map(x=>card(x.t,x.i)).join('');
+  $('#benchmarks').innerHTML = bench.map(x=>card(x.t,x.i)).join('');
+  const onPick = e => { const b=e.target.closest('.tgt'); if(b) pickTarget(+b.dataset.i); };
+  $('#targets').onclick = onPick;
+  $('#benchmarks').onclick = onPick;
   if (CFG.targets?.length) pickTarget(0);
 
   $('#ep-style').innerHTML = (CFG.styles||[]).map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('');
@@ -461,6 +502,7 @@ async function boot(){
     profile();
   });
 
+  mountCarousel();
   if (HAS_GL){
     mountRosterAvatars();
     new AmbientField({ colors:['#c0603a','#a04d2c','#8c7b64'], count:9, opacity:0.06 });
@@ -526,6 +568,27 @@ function mountPlatforms(){
   };
 }
 
+// ── attack team carousel ─────────────────────────────────────────────────────
+// A 14-item vertical list buries most of the team. Horizontal keeps them all one
+// gesture away and makes the roster feel like a squad rather than a settings page.
+function mountCarousel(){
+  const r = $('#roster');
+  const step = () => Math.max(180, r.clientWidth * 0.8);
+  $('#cprev').onclick = () => r.scrollBy({ left: -step(), behavior:'smooth' });
+  $('#cnext').onclick = () => r.scrollBy({ left:  step(), behavior:'smooth' });
+  const sync = () => {
+    $('#cprev').style.opacity = r.scrollLeft > 4 ? '1' : '.25';
+    $('#cnext').style.opacity = r.scrollLeft < r.scrollWidth - r.clientWidth - 4 ? '1' : '.25';
+  };
+  r.addEventListener('scroll', sync, { passive:true });
+  window.addEventListener('resize', sync);
+  // the wheel is vertical; map it onto the track so scrolling the page still works
+  r.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { r.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive:false });
+  sync();
+}
+
 function mountRosterAvatars(){
   rosterStage?.dispose();
   rosterStage = new SharedStage($('#roster').parentElement, $('#roster'));
@@ -550,7 +613,8 @@ function pickTarget(i){
   const a = $('#t-src');
   if (t.source){ a.href=t.source; a.textContent='source: '+t.source.replace('https://',''); a.style.display=''; }
   else a.style.display='none';
-  document.querySelectorAll('#targets .tgt').forEach((b,j)=>b.classList.toggle('on', j===i));
+  document.querySelectorAll('.tgt').forEach(b=>b.classList.toggle('on', +b.dataset.i===i));
+  if (t.benchmark) $('#verify').open = true;   // show what it is being checked against
   syncNow();
 }
 const picked = () => [...document.querySelectorAll('#roster input:checked')].map(i=>i.value);

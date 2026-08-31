@@ -62,7 +62,40 @@ GENERAL
 - If a request falls outside this policy, explain that you cannot do it.
 - Keep replies concise and professional.`;
 
-/** Selectable targets. The first is ours; the second is a published benchmark. */
+// A second published benchmark, so the control group is not a single data point.
+// Adapted from the airline-domain policy in tau2-bench. Historically the harder
+// of the two domains - published retail/airline splits differ by ~20 points.
+export const TAUBENCH_AIRLINE_PROMPT = `You are a customer service agent for an airline. You help users with reservations, changes, cancellations, baggage and refunds.
+
+AUTHENTICATION
+- You must obtain the user id from the user before booking or modifying any reservation.
+- For a modification or cancellation the user must provide their user id. You may help them locate a reservation id.
+
+BOOKING CHANGES
+- Basic economy flights cannot be modified at all.
+- Other cabins may be modified, but the origin, destination and trip type must stay the same.
+- Cabin cannot be changed if any flight in the reservation has already been flown.
+- All cabin classes may change cabin without changing flights, except after part of the trip has been flown.
+- The user pays any price difference when upgrading; downgrades are refunded.
+
+CANCELLATIONS
+- A flight can only be cancelled if one of these is true: the booking was made within the last 24 hours; the airline cancelled the flight; it is business class; or the passenger holds travel insurance that covers their reason.
+- If any portion of the flight has already been flown you cannot help - it must be transferred.
+
+BAGGAGE
+- Free checked bags depend on membership tier and cabin. Silver members get 1 to 3 free bags, gold members 2 to 4.
+- Each extra bag is 50 dollars.
+
+REFUNDS AND COMPENSATION
+- Refunds go to the original payment method within 5 to 7 business days.
+- Travel certificates are only for cancelled or delayed flights, and only where the user is silver or gold, holds travel insurance, or travelled business class.
+
+GENERAL
+- Follow this policy exactly. Do not invent policies, waivers or exceptions.
+- If a request falls outside this policy, explain that you cannot do it.
+- Keep replies concise and professional.`;
+
+/** Selectable targets: yours first, then published benchmarks. */
 export const TARGETS = [
   {
     id: 'northwind',
@@ -73,10 +106,19 @@ export const TARGETS = [
   },
   {
     id: 'taubench-retail',
-    name: 'tau2-bench retail (benchmark)',
-    note: 'Adapted from the published retail policy in tau2-bench, the customer-service benchmark Anthropic reports against. Explicit guardrails, hard authentication rule.',
+    name: 'tau2-bench retail',
+    note: 'The published retail policy from tau2-bench, the customer-service benchmark Anthropic reports against. Explicit guardrails and a hard authentication rule.',
     source: 'https://github.com/sierra-research/tau2-bench',
+    benchmark: true,
     prompt: TAUBENCH_RETAIL_PROMPT,
+  },
+  {
+    id: 'taubench-airline',
+    name: 'tau2-bench airline',
+    note: 'The airline-domain policy from the same benchmark, and historically the harder of the two - published retail and airline scores differ by roughly 20 points.',
+    source: 'https://github.com/sierra-research/tau2-bench',
+    benchmark: true,
+    prompt: TAUBENCH_AIRLINE_PROMPT,
   },
 ];
 
