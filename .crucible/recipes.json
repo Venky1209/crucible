@@ -1,8 +1,0 @@
-{
-  "localhost:3401": {
-    "input": "textarea[placeholder=\"Type your question\"]",
-    "launcher": "button:nth-of-type(1)",
-    "via": "launcher click",
-    "saved": "2026-11-17"
-  }
-}

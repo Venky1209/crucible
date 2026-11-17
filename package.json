@@ -14,7 +14,9 @@
     "calibrate": "node --env-file=.env calibrate.js",
     "study": "node --env-file=.env study.js",
     "test": "node --test test/",
-    "dev:mock": "node server.js"
+    "dev:mock": "node server.js",
+    "compat": "node compat.js",
+    "fixtures": "node test/fixtures/server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
