@@ -329,7 +329,7 @@
       <div class="calc-out">
         <div class="calc-big" id="cYear">$2,000</div>
         <div class="calc-l">given away a year · <span id="cPct">0.02%</span> of revenue</div>
-        <div class="calc-yr">From <b id="cTimes">33</b> <span id="cNoun">conversations</span> a year that end with a yes your policy never allowed.</div>
+        <div class="calc-yr">From <b id="cTimes">33</b> <span id="cNoun">conversations a year that end</span> with a yes your policy never allowed.</div>
         <div class="calc-yr">If the trick gets shared and five times as many people try it: <b id="cSpread">$10,000</b> a year.</div>
         <div class="calc-plus">For most shops the everyday leak is modest. The expensive part is the single big yes: a $7,000
           buy-back offer (BMW Toronto) or a court ruling (Air Canada). Crucible finds those conversations before a customer does.</div>
@@ -610,7 +610,7 @@
       $('cYear').textContent = money(lost);
       $('cPct').textContent = (100 * lost / r).toFixed(lost / r < 0.001 ? 3 : 2) + '%';
       $('cTimes').textContent = Math.round(yes).toLocaleString('en-US');
-      $('cNoun').textContent = Math.round(yes) === 1 ? 'conversation' : 'conversations';
+      $('cNoun').textContent = Math.round(yes) === 1 ? 'conversation a year that ends' : 'conversations a year that end';
       $('cSpread').textContent = money(lost * 5);
     }
     // Illustrative presets: where one wrong yes is worth more than a refunded parcel.
