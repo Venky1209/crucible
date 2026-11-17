@@ -209,6 +209,13 @@
 
   .calc select{width:100%;max-width:260px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--paper);font:600 14px var(--sans);color:var(--ink)}
   .calc small.rough{color:var(--faint)}
+
+  .latest{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:4px 0 14px}
+  .latest>div{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px}
+  .latest b{font:400 38px/1 var(--display);color:var(--alarm)}
+  .latest span{font-size:13.5px;color:var(--ink2);line-height:1.5}
+  .latest a{font-size:12.5px;color:var(--clay-deep);font-weight:600}
+  @media(max-width:800px){.latest{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -363,6 +370,14 @@
           above actually happened.</small>
       </div>
     </div>
+
+    <div class="latest">
+      <div><b>55%</b><span>Best first-try score on τ³-Banking, the newest support-agent track (2026). Claude Opus 5 scores 48.7%.</span>
+        <a href="https://taubench.com/leaderboard/?benchmark=core" target="_blank" rel="noopener">Leaderboard</a></div>
+      <div><b>24%</b><span>Best result when AI coding agents build the support agent themselves (ττ-bench, Sep 2026). The human row on the same board: 82.2%.</span>
+        <a href="https://sierra-research.github.io/hyper-tau-bench/" target="_blank" rel="noopener">Leaderboard</a></div>
+    </div>
+    <p>And every customer in those tests wanted the task done. Nobody was pushing.</p>
 
     <p>So the number a company actually needs, <b>how often a polite, persistent customer gets the
       agent to break policy</b>, is not on any leaderboard. Crucible measures it for your agent:
