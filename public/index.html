@@ -199,6 +199,13 @@
   .calc-yr b{color:#fff}
   .calc-plus{margin-top:12px;font-size:13px;color:#a99f90;line-height:1.5}
   @media(max-width:800px){.stakes,.calc{grid-template-columns:1fr}}
+
+  .calc label b.rev{font:400 30px/1 var(--display);color:var(--ink)}
+  .calc input[type=range]{width:100%;accent-color:var(--clay);padding:0;border:0;background:none}
+  .ticks{display:flex;justify-content:space-between;font:10.5px/1 var(--mono);color:var(--faint);margin-top:-6px}
+  .assume{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+  .assume summary{cursor:pointer;font-size:13px;color:var(--clay-deep);font-weight:600}
+  .assume label{margin-top:12px}
 </style>
 </head>
 <body>
@@ -295,23 +302,32 @@
 
     <div class="calc" id="calc">
       <div class="calc-in">
-        <p class="kicker" style="margin:0 0 4px">What it could cost you</p>
-        <p class="calc-note">Example numbers. Put in your own.</p>
-        <label>Support conversations a month<input type="number" id="cConv" value="20000" min="0" step="1000"></label>
-        <label>Customers who push for something they shouldn't get<span class="u"><input type="number" id="cPush" value="1" min="0" max="100" step="0.5">%</span></label>
-        <label>Times your bot gives in<span class="u"><input type="number" id="cFold" value="20" min="0" max="100" step="5">%</span><small>Crucible measures this for your bot.</small></label>
-        <label>Average value given away<span class="u">$<input type="number" id="cVal" value="40" min="0" step="5"></span></label>
+        <p class="kicker" style="margin:0 0 4px">What it could mean for you</p>
+        <label>Your yearly revenue <b class="rev" id="cRevLabel">$10M</b>
+          <input type="range" id="cRev" min="0" max="100" value="50" aria-label="Yearly revenue"></label>
+        <div class="ticks"><span>$100K</span><span>$1M</span><span>$10M</span><span>$100M</span><span>$1B</span></div>
+        <details class="assume"><summary>Change the assumptions</summary>
+          <label>Average order value<span class="u">$<input type="number" id="cAov" value="60" min="1" step="5"></span></label>
+          <label>Support chats per 100 orders<span class="u"><input type="number" id="cContact" value="10" min="0" max="100" step="1"></span>
+            <small>Published figures range from 2 to 46 depending on what you sell.</small></label>
+          <label>Customers who push for something they shouldn't get<span class="u"><input type="number" id="cPush" value="1" min="0" max="100" step="0.5">%</span></label>
+          <label>Times your bot gives in<span class="u"><input type="number" id="cFold" value="20" min="0" max="100" step="5">%</span>
+            <small>Crucible measures this for your bot.</small></label>
+          <label>Value of each wrong yes<span class="u">$<input type="number" id="cVal" value="60" min="0" step="5"></span>
+            <small>Default: one refunded order.</small></label>
+        </details>
       </div>
       <div class="calc-out">
-        <div class="calc-big" id="cMonth">$1,600</div>
-        <div class="calc-l">given away a month</div>
-        <div class="calc-yr"><b id="cYear">$19,200</b> a year, from <b id="cTimes">40</b> conversations a month that end with a yes your
-          policy never allowed.</div>
-        <div class="calc-plus">Before any legal costs, chargebacks, or the day someone posts the trick online.</div>
+        <div class="calc-big" id="cYear">$2,000</div>
+        <div class="calc-l">given away a year · <span id="cPct">0.02%</span> of revenue</div>
+        <div class="calc-yr">From <b id="cTimes">33</b> conversations a year that end with a yes your policy never allowed.</div>
+        <div class="calc-yr">If the trick gets shared and five times as many people try it: <b id="cSpread">$10,000</b> a year.</div>
+        <div class="calc-plus">For most shops the everyday leak is modest. The expensive part is the single big yes: a $7,000
+          buy-back offer (BMW Toronto) or a court ruling (Air Canada). Crucible finds those conversations before a customer does.</div>
       </div>
     </div>
 
-    <p>Every one of the cases above was found by a customer, after launch. Crucible's job is to find these
+<p>Every one of the cases above was found by a customer, after launch. Crucible's job is to find these
       conversations before your customers do, and tell you how often they work.</p>
   </section>
 
@@ -566,19 +582,27 @@
   })();
 </script>
 <script>
-  // Cost estimate from the visitor's own numbers. Nothing is stored or sent anywhere.
+  // Cost estimate from the visitor's revenue and editable assumptions. Nothing is stored or sent anywhere.
   (() => {
-    const ids = ['cConv', 'cPush', 'cFold', 'cVal'], $ = (id) => document.getElementById(id);
-    if (!$('cConv')) return;
+    const $ = (id) => document.getElementById(id);
+    if (!$('cRev')) return;
     const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
+    const short = (n) => n >= 1e9 ? '$' + (n / 1e9).toFixed(n >= 1e10 ? 0 : 1).replace(/\.0$/, '') + 'B'
+      : n >= 1e6 ? '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M' : '$' + Math.round(n / 1e3) + 'K';
+    const rev = () => Math.pow(10, 5 + 4 * Number($('cRev').value) / 100);   // $100K to $1B, log scale
     function calc() {
-      const [conv, push, fold, val] = ids.map((id) => Math.max(0, Number($(id).value) || 0));
-      const times = conv * (push / 100) * (fold / 100);
-      $('cMonth').textContent = money(times * val);
-      $('cYear').textContent = money(times * val * 12);
-      $('cTimes').textContent = Math.round(times).toLocaleString('en-US');
+      const r = rev(), num = (id) => Math.max(0, Number($(id).value) || 0);
+      const aov = Math.max(1, num('cAov'));
+      const chats = (r / aov) * num('cContact') / 100;
+      const yes = chats * num('cPush') / 100 * num('cFold') / 100;
+      const lost = yes * num('cVal');
+      $('cRevLabel').textContent = short(r);
+      $('cYear').textContent = money(lost);
+      $('cPct').textContent = (100 * lost / r).toFixed(lost / r < 0.001 ? 3 : 2) + '%';
+      $('cTimes').textContent = Math.round(yes).toLocaleString('en-US');
+      $('cSpread').textContent = money(lost * 5);
     }
-    ids.forEach((id) => $(id).addEventListener('input', calc));
+    ['cRev', 'cAov', 'cContact', 'cPush', 'cFold', 'cVal'].forEach((id) => $(id).addEventListener('input', calc));
     calc();
   })();
 </script>
