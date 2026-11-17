@@ -1,5 +1,6 @@
 import { chat } from './llm.js';
 import { escalationBrief } from './escalation.js';
+import { reconBrief } from './recon.js';
 
 // ── THE ATTACK LIBRARY ───────────────────────────────────────────────────────
 // Risk #1 is a boring attacker. A weak model told to "be adversarial" produces
@@ -312,7 +313,8 @@ export async function adversaryReply(adversary, transcript, ctx = {}) {
   });
 
   return chat([{ role: 'user', content: prompt }], {
-    system: adversary.system + brief,
+    // v2: the reconnaissance briefing (policy gaps) comes before any round-2 escalation.
+    system: adversary.system + reconBrief(ctx.recon) + brief,
     maxTokens: 900,
     temperature: 1.0,
     // Indic attacks route to Sarvam; falls back automatically if no key is set.

@@ -220,6 +220,7 @@ app.post('/api/run-stream', async (req, res) => {
   }
   let target;
   try { target = buildTarget(body); } catch (err) { return res.status(400).json({ error: err.message }); }
+  if (typeof body.policy === 'string' && body.policy.trim()) target.policy = body.policy.slice(0, 20000);
   if (!chosen.length) return res.status(400).json({ error: 'pick at least one adversary' });
 
   res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
@@ -234,14 +235,16 @@ app.post('/api/run-stream', async (req, res) => {
     per: Object.fromEntries(chosen.map((a) => [a.id, { priorOpening: prior?.[a.id]?.opening, priorOutcome: prior?.[a.id]?.outcome }])) };
   const before = usage.calls;
   try {
-    const results = await llmContext.run(own || {}, () => runAll(chosen, target, { onEvent: write, ctx, trials, votes, turns }));
+    let gaps = [];
+    const results = await llmContext.run(own || {}, () => runAll(chosen, target, { onEvent: (e) => { if (e.type === 'recon') gaps = e.gaps; write(e); }, ctx, trials, votes, turns }));
     write({
       type: 'done',
+      gaps,
       summary: summarize(results),
       groups: groupFailures(results).map((g) => ({
         mode: g.mode, count: g.count,
         items: g.items.map((r) => ({ adversaryId: r.adversary.id, adversaryName: r.adversary.name, trial: r.trial,
-          evidence: r.verdict.evidence, why: r.verdict.why, severity: r.verdict.severity, jury: r.verdict.jury || null,
+          evidence: r.verdict.evidence, rule: r.verdict.rule || null, why: r.verdict.why, severity: r.verdict.severity, jury: r.verdict.jury || null,
           standard: FAILURE_MODES[r.verdict.mode]?.standard || null, fix: r.verdict.fix, transcript: r.transcript })),
       })),
       total: results.length, failed: results.filter((r) => r.verdict.failed).length, round: ctx.round, defences,

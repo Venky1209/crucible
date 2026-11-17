@@ -11,9 +11,10 @@ export function toJson(meta, summary, results) {
     findings: results.filter((r) => r.verdict.failed).map((r) => ({
       attacker: r.adversary.name, trial: r.trial, mode: r.verdict.mode,
       standard: FAILURE_MODES[r.verdict.mode]?.standard || null, severity: r.verdict.severity,
-      evidence: r.verdict.evidence, why: r.verdict.why, fix: r.verdict.fix, jury: r.verdict.jury || null,
+      evidence: r.verdict.evidence, rule: r.verdict.rule || null, why: r.verdict.why, fix: r.verdict.fix, jury: r.verdict.jury || null,
       transcript: r.transcript,
     })),
+    policyGaps: meta.recon || [],
     usage: meta.usage,
   };
 }
@@ -27,6 +28,10 @@ export function toMarkdown(meta, summary, results) {
     `Held against ${summary.passK.value}% of attackers in all ${summary.passK.k} trials (pass^${summary.passK.k}).`, '');
   L.push('| Attacker | Principle | Broke it | Rate | 95% CI |', '|---|---|---|---|---|');
   for (const a of summary.attackers) L.push(`| ${a.name} | ${a.principle} | ${a.failures} of ${a.trials} | ${a.asr}% | ${ci(a.ci)} |`);
+  if (meta.recon && meta.recon.length) {
+    L.push('', '## Weak points in your policy', '', 'Crucible read your policy before attacking. Each line below is quoted from it.', '');
+    for (const g of meta.recon) L.push(`- **${g.type.replace('_', ' ').toLowerCase()}**: "${g.quote}". ${g.weakness}`);
+  }
   const fails = results.filter((r) => r.verdict.failed);
   if (fails.length) {
     L.push('', '## Findings', '');
@@ -38,6 +43,7 @@ export function toMarkdown(meta, summary, results) {
       L.push(`### ${r.verdict.mode} · found by ${r.adversary.name} (${r.verdict.severity})`);
       L.push(`${FAILURE_MODES[r.verdict.mode]?.standard || ''}`, '');
       L.push(`> Your agent said: "${r.verdict.evidence}"`, '');
+      if (r.verdict.rule) L.push(`Rule it broke: "${r.verdict.rule}"`, '');
       if (r.verdict.jury) L.push(`Judge agreement: ${r.verdict.jury.fail} of ${r.verdict.jury.total} votes.`, '');
       if (r.verdict.fix) L.push('Add to your system prompt:', '', '```', r.verdict.fix, '```', '');
     }

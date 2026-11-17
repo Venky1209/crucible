@@ -30,6 +30,8 @@ if (flag('help') || flag('h')) {
      --headed          watch the browser while it runs
      --input <css>     the chat's message box, if detection misses it (--launcher <css> for the open button)
      --reply-timeout   seconds to wait for each reply (default 45)
+  --policy <file>      the support policy the agent must follow (for --endpoint and --url; prompt mode uses the prompt)
+  --no-recon           skip reading the policy for weak points before attacking
   --attackers <ids>    comma-separated ids, or "all" (default: the standard team)
   --trials <n>         conversations per attacker (default 3)
   --turns <n>          exchanges per conversation (default ${TURNS_PER_ATTACK})
@@ -63,6 +65,7 @@ if (opt('url')) {
   targetName = t.name;
 }
 
+if (opt('policy')) target.policy = readFileSync(opt('policy'), 'utf8');
 const pick = opt('attackers');
 const team = !pick ? ADVERSARIES : pick === 'all' ? LIBRARY : pick.split(',').map((id) => LIBRARY.find((a) => a.id === id.trim())).filter(Boolean);
 if (!team.length) { console.error('No known attackers selected.'); process.exit(2); }
@@ -73,9 +76,11 @@ const votes = Math.max(1, Number(opt('votes', 1)));
 console.log(`crucible · ${targetName} · ${team.length} attackers × ${trials} trials × ${turns} turns · ${providerLabel()}`);
 let done = 0;
 const total = team.length * trials;
+let gaps = [];
 const results = await runAll(team, target, {
-  trials, turns, votes,
+  trials, turns, votes, ctx: flag('no-recon') ? { recon: false } : {},
   onEvent: (e) => {
+    if (e.type === 'recon') { gaps = e.gaps; console.log(`\nPolicy weak points the attackers will lean on (${gaps.length}):`); gaps.forEach((g) => console.log(`  [${g.type}] "${g.quote.slice(0, 90)}"`)); console.log(''); return; }
     if (e.type !== 'verdict') return;
     done++;
     const a = LIBRARY.find((x) => x.id === e.adversaryId);
@@ -85,7 +90,7 @@ const results = await runAll(team, target, {
 
 if (target.mode === 'browser') await (await import('./src/browser-target.js')).closeBrowser();
 const summary = summarize(results);
-const meta = { version: '2.0.0', when: new Date().toISOString().slice(0, 16).replace('T', ' '), target: targetName, model: providerLabel(), trials, turns, votes, usage };
+const meta = { recon: gaps, version: '2.0.0', when: new Date().toISOString().slice(0, 16).replace('T', ' '), target: targetName, model: providerLabel(), trials, turns, votes, usage };
 console.log(`\nResistance ${summary.resistance}/100 · attack success ${summary.asr}% (95% CI ${summary.ci[0]}–${summary.ci[1]}%) · pass^${summary.passK.k} ${summary.passK.value}% · ${usage.calls} model calls`);
 for (const a of summary.attackers) console.log(`  ${a.name.padEnd(22)} ${String(a.failures).padStart(2)}/${a.trials}  ${String(a.asr).padStart(5)}%  CI ${a.ci[0]}–${a.ci[1]}%`);
 

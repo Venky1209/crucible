@@ -409,6 +409,17 @@
   .trialsep{margin:10px 0 6px;font:11px/1 var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.08em;border-top:1px dashed var(--line2);padding-top:8px}
   .statline{font:11.5px/1.3 var(--mono);color:var(--ink2);padding:6px 11px;border:1px solid var(--line2);border-radius:20px;background:var(--card)}
   .statline b{color:var(--clay-deep)}
+
+  /* v2: policy-grounded findings and reconnaissance */
+  .rulebox{margin-top:8px;padding:9px 12px;border-left:3px solid var(--clay);background:var(--clay-soft);border-radius:0 8px 8px 0;font-size:13.5px;color:var(--ink2)}
+  .rulebox .lb{display:block;font:10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--clay-deep);margin-bottom:5px}
+  .gaps{margin:10px 0 16px;padding:14px 16px;border:1px solid var(--line2);border-radius:12px;background:var(--card)}
+  .gaps-h{font:10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;font-weight:700}
+  .gap{display:grid;grid-template-columns:130px 1fr;gap:2px 12px;padding:7px 0;border-top:1px solid var(--line)}
+  .gap:first-of-type{border-top:0}
+  .gt{font:11px/1.4 var(--mono);color:var(--clay-deep);grid-row:span 2}
+  .gap q{font-size:13.5px;color:var(--ink)}
+  .gw{font-size:12.5px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -963,6 +974,7 @@ function render(e){
       </div>
       <div class="f-w">${esc(i.why||'')}</div>
       <div class="quote"><span class="lb">Your agent said</span>${esc(i.evidence)}</div>
+      ${i.rule?`<div class="rulebox"><span class="lb">Rule it broke, from your policy</span>${esc(i.rule)}</div>`:''}
       ${i.fix?`<div class="fix"><div class="fix-b">
         <span class="lb">Add this line to your system prompt</span><code>${esc(i.fix)}</code></div>
         <button class="btn ap sm fixbtn" data-fix="${esc(i.fix)}">Apply</button></div>`:''}
@@ -972,7 +984,10 @@ function render(e){
        failures to report. Crucible found real failures in other agents using these same attackers,
        so this is a clean result, not a quiet one.</span></div>`;
 
-  const r=$('#results'); r.innerHTML=head+body; r.classList.add('on');
+  // v2: what reconnaissance found in the policy before the attack started.
+  const gaps = (e.gaps||[]).length ? `<div class="gaps"><div class="gaps-h">Weak points Crucible found in your policy before attacking</div>${
+    e.gaps.map(g=>`<div class="gap"><span class="gt">${esc(g.type.replace(/_/g,' ').toLowerCase())}</span><q>${esc(g.quote)}</q><span class="gw">${esc(g.weakness||'')}</span></div>`).join('')}</div>` : '';
+  const r=$('#results'); r.innerHTML=head+gaps+body; r.classList.add('on');
   lastFailed=e.failed;
   $('#board').innerHTML = `<b>${e.failed}</b><span>of ${e.total} broke</span>`;
   requestAnimationFrame(()=> r.scrollIntoView({behavior:'smooth', block:'nearest'}));

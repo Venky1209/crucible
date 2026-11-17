@@ -1,6 +1,7 @@
 import { adversaryReply } from './adversaries.js';
 import { targetReply } from './target.js';
 import { judgeTranscript } from './judge.js';
+import { analyzePolicy } from './recon.js';
 
 export const TURNS_PER_ATTACK = Number(process.env.TURNS || 4);
 
@@ -39,7 +40,7 @@ export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, o
     await conv?.close();
   }
 
-  const verdict = await judgeTranscript(transcript, adversary, { votes });
+  const verdict = await judgeTranscript(transcript, adversary, { votes, policy: ctx.policy || null });
   if (conv?.handover) verdict.handover = true;
   onEvent({ type: 'verdict', adversaryId: adversary.id, verdict, trial });
   return { adversary, transcript, verdict, trial };
@@ -50,6 +51,12 @@ export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, o
  * Trials of one attacker run one after another; attackers in a wave run side by side.
  */
 export async function runAll(adversaries, target, { concurrency = 2, onEvent = () => {}, turns, ctx = {}, trials = 1, votes = 1 } = {}) {
+  // v2: the policy the agent must follow. In prompt mode it is the agent's own instructions; for a live
+  // agent or a website it comes from --policy / the request. It grounds the judge and feeds reconnaissance.
+  const policy = ctx.policy ?? target.policy ?? (target.mode === 'prompt' || typeof target === 'string' ? (target.prompt || target) : null);
+  const recon = ctx.recon === false || !policy ? [] : (ctx.recon || await analyzePolicy(policy));
+  if (recon.length) onEvent({ type: 'recon', gaps: recon });
+  ctx = { ...ctx, policy, recon };
   const results = [];
   for (let i = 0; i < adversaries.length; i += concurrency) {
     const wave = adversaries.slice(i, i + concurrency);
@@ -66,6 +73,7 @@ export async function runAll(adversaries, target, { concurrency = 2, onEvent = (
 }
 
 export { summarize } from './stats.js';
+export { analyzePolicy } from './recon.js';
 
 /** Group failures by mode - the judge already labelled them, so no clustering needed. */
 export function groupFailures(results) {
