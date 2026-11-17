@@ -118,6 +118,28 @@
   footer a{color:var(--dim)}
   @media(max-width:800px){.grid2,.trap,.loop{grid-template-columns:1fr}
     .trap>div:first-child{border-right:0;border-bottom:1px solid var(--line)}}
+
+  /* the problem: failure types and the case carousel */
+  .fails{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0 30px}
+  .fails>div{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 16px;box-shadow:var(--shadow)}
+  .fails b{display:block;font-size:15px;margin-bottom:4px;color:var(--alarm)}
+  .fails span{font-size:13.5px;color:var(--dim);line-height:1.5}
+  .cases-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .cbtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);background:var(--card);font-size:20px;line-height:1;cursor:pointer;color:var(--ink2)}
+  .cbtn:hover{border-color:var(--clay);color:var(--clay)}
+  .cases{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 14px;scrollbar-width:thin;scroll-behavior:smooth}
+  .case{flex:0 0 300px;scroll-snap-align:start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+  .case h3{margin:10px 0 6px;font:400 24px/1.1 var(--display)}
+  .case p{margin:0 0 14px;font-size:14px;color:var(--ink2);line-height:1.55;flex:1}
+  .cmeta{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.3 var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .src{padding:3px 7px;border-radius:20px;white-space:nowrap}
+  .src.v{background:var(--pass-soft);color:var(--pass)}
+  .cfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px}
+  .cfoot .mode{font:10.5px/1.3 var(--mono);color:var(--alarm);background:var(--alarm-soft);padding:4px 8px;border-radius:7px}
+  .cfoot a{color:var(--clay-deep);font-weight:600}
+  .big.sm{font-size:34px}
+  .srcline{font-size:12.5px;color:var(--faint)} .srcline a{color:var(--dim)}
+  @media(max-width:800px){.fails{grid-template-columns:1fr}.case{flex-basis:84%}}
 </style>
 </head>
 <body>
@@ -146,59 +168,93 @@
   <section>
     <p class="kicker">The problem</p>
     <h2>Agents don't fail loudly. They fail politely.</h2>
-    <p>A support agent that invents a refund policy, or cancels an account for someone who
-      was never verified, doesn't crash. It fails at 3am, to a customer who sounded
-      completely reasonable, and nobody finds out until the chargebacks arrive.</p>
+    <p>Support agents are no longer just answering questions. They quote policy, issue refunds,
+      apply discounts and change accounts. They are also built to be helpful, so a customer who
+      is polite, plausible and persistent can talk them into acting outside the rules. Nothing
+      crashes. The agent says yes, the conversation ends nicely, and the company finds out later.</p>
 
-    <div class="quote">
-      In February 2024 a tribunal held Air Canada liable for a bereavement refund policy
-      its chatbot invented. The airline argued the bot was <em>“a separate legal entity
-      responsible for its own actions.”</em> It lost.
-      <cite>Moffatt v. Air Canada, BC Civil Resolution Tribunal</cite>
+    <div class="fails">
+      <div><b>It invents a policy or a fact</b><span>and states it with confidence, so the customer acts on it.</span></div>
+      <div><b>It agrees to what it can't approve</b><span>a price, a refund, a discount, an exception.</span></div>
+      <div><b>It gets talked out of its rules</b><span>one reasonable-sounding message at a time.</span></div>
     </div>
 
-    <p>That is not an edge case, it is the most common failure we find. OWASP's 2026 list
-      for LLM applications — compiled from <b>7,714 real incidents</b> — moved
-      <b>Excessive Agency from #6 to #3</b>. The loss is concentrating in autonomy.</p>
+    <div class="cases-h"><p class="kicker" style="margin:0">It keeps happening</p><div class="sp"></div>
+      <button class="cbtn" id="cprev" aria-label="Previous case">&#8249;</button>
+      <button class="cbtn" id="cnext" aria-label="Next case">&#8250;</button></div>
+    <div class="cases" id="cases">
+      <article class="case">
+        <div class="cmeta"><span>Jun 2026 · Car dealer, Toronto</span><span class="src v">Named in national news</span></div>
+        <h3>BMW Toronto</h3>
+        <p>Its sales chatbot "Quinn" made a customer a firm offer to buy back his car, about $7,000 above
+          its value. The dealership revoked it, then reinstated it after CBC News asked questions, and now
+          only lets humans make offers.</p>
+        <div class="cfoot"><span class="mode">Agreed to what it can't approve</span><a href="https://www.carscoops.com/2026/06/bmw-dealer-ai-chatbot-offer/" target="_blank" rel="noopener">Source</a></div>
+      </article>
+      <article class="case">
+        <div class="cmeta"><span>May 2026 · Clinic, Germany</span><span class="src v">Court ruling</span></div>
+        <h3>Higher Regional Court Hamm</h3>
+        <p>A clinic's website chatbot invented specialist medical titles for its doctors. The court held
+          the clinic responsible and refused to treat the bot as an independent third party, even if it
+          had been trained only on correct data. Case 4 UKl 3/25.</p>
+        <div class="cfoot"><span class="mode">Invented facts</span><a href="https://www.justiz.nrw/presse/2026-05-12" target="_blank" rel="noopener">Court press release</a></div>
+      </article>
+      <article class="case">
+        <div class="cmeta"><span>Apr 2025 · Software</span><span class="src v">Company apologised</span></div>
+        <h3>Cursor</h3>
+        <p>Its support bot told users a new rule limited each subscription to one device. The rule didn't
+          exist. Developers cancelled, and the co-founder apologised publicly and refunded them.</p>
+        <div class="cfoot"><span class="mode">Invented policy</span><a href="https://www.cxnetwork.com/artificial-intelligence/news/chatbot-hallucination-backlash" target="_blank" rel="noopener">Source</a></div>
+      </article>
+      <article class="case">
+        <div class="cmeta"><span>Feb 2024 · Airline</span><span class="src v">Tribunal ruling</span></div>
+        <h3>Air Canada</h3>
+        <p>Its chatbot promised a grieving customer a bereavement refund that the airline's policy didn't
+          allow. Air Canada argued the bot was responsible for its own words. The tribunal rejected that
+          and made it pay.</p>
+        <div class="cfoot"><span class="mode">Invented policy</span><a href="https://www.cbsnews.com/news/aircanada-chatbot-discount-customer" target="_blank" rel="noopener">Source</a></div>
+      </article>
+      <article class="case">
+        <div class="cmeta"><span>Jan 2024 · Delivery</span><span class="src v">Company confirmed</span></div>
+        <h3>DPD</h3>
+        <p>A frustrated customer coaxed the parcel firm's chatbot into swearing and calling DPD the worst
+          delivery firm in the world. DPD blamed an update and switched the AI off.</p>
+        <div class="cfoot"><span class="mode">Talked out of its rules</span><a href="https://customerthink.com/chatbots-under-fire-navigating-ai-pitfalls-with-insights-from-dpd-and-air-canada/" target="_blank" rel="noopener">Source</a></div>
+      </article>
+    </div></div>
+
+    <p>Every one of these was found by a customer, after launch. And the law has started to
+      answer the question companies hoped to dodge: <b>what your bot says, you said.</b> Crucible's
+      job is to find these conversations before your customers do.</p>
   </section>
 
   <section id="proof">
-    <p class="kicker">Why you can't just read a benchmark</p>
-    <h2>The same model. The same benchmark. Two answers.</h2>
-    <p>τ²-bench is the benchmark built to measure exactly this: does a support agent follow
-      its own policy. But it publishes under more than one metric, and the numbers disagree
-      enough to reverse your conclusion.</p>
+    <p class="kicker">Why a benchmark score isn't enough</p>
+    <h2>Benchmarks test a customer who wants help. Your risk is the one who wants something.</h2>
+    <p>τ-bench is the standard benchmark for support agents: can the agent complete a customer's
+      request while following the company's policy. It is a good benchmark. It leaves two gaps.</p>
 
     <div class="trap">
       <div>
-        <h4>Pass-rate metric</h4>
-        <div class="big lo">36</div>
-        <small>GPT-4o. On the strict measure, deployable models fail constantly —
-          Claude Sonnet 4.5 sits at 63, and the best entry is 79.</small>
+        <h4>Gap 1 · One good run proves little</h4>
+        <div class="big lo sm">61% → under 25%</div>
+        <small>In the τ-bench paper, GPT-4o solved about 61% of retail tasks on a single try, but
+          under 25% when it had to get the same task right in 8 separate attempts. An agent that
+          holds once can still fold the next time.</small>
       </div>
       <div>
-        <h4>Accuracy metric</h4>
-        <div class="big hi">99.1</div>
-        <small>GLM-5.2 on the same benchmark. Read this number alone and you would
-          conclude the problem is solved.</small>
+        <h4>Gap 2 · The simulated customer isn't trying to persuade</h4>
+        <div class="big sm" style="color:var(--ink2)">No pressure</div>
+        <small>The benchmark's customer follows a scripted goal. It isn't designed to flatter, invent
+          a policy, claim urgency or escalate slowly over many turns, which is how the failures
+          above actually happened.</small>
       </div>
     </div>
 
-    <p>The leaderboard's own guidance is to match the domain, scaffold, prompts, trial count
-      and <span class="chip" style="padding:3px 8px">pass^k</span> before comparing anything.
-      Almost nobody does. <b>Quote a τ²-bench score without its metric and you are comparing
-      apples to oranges.</b></p>
-
-    <p>There is a second gap, and it is the one that matters here: <b>every one of those
-      numbers is measured against a cooperative user.</b> The simulator has an honest goal.
-      Nobody has published what happens when the person on the other end is
-      <em>trying</em> to get something.</p>
-
-    <div class="quote">
-      Frontier models have largely closed the gap on cooperative users. Nobody has measured
-      the adversarial case. That number does not exist yet.
-      <cite>Which is the entire reason this tool exists.</cite>
-    </div>
+    <p>So the number a company actually needs, <b>how often a polite, persistent customer gets the
+      agent to break policy</b>, is not on any leaderboard. Crucible measures it for your agent:
+      many conversations, an attack success rate with error bars, and the exact line that broke.</p>
+    <p class="srcline">Source for gap 1: Yao et al., <a href="https://arxiv.org/abs/2406.12045" target="_blank" rel="noopener">τ-bench</a>, ICLR 2025.</p>
   </section>
 
   <section>
@@ -344,6 +400,13 @@
   // Same ambient field as the tool, so the two pages read as one product.
   import { AmbientField, webglAvailable } from './avatar.js';
   if (webglAvailable()) new AmbientField({ colors:['#c0603a','#a04d2c','#8c7b64'], count:9, opacity:0.06 });
+</script>
+<script>
+  // Case carousel: arrows scroll one card; the row also scrolls by touch and trackpad.
+  (() => { const row = document.getElementById('cases'); if (!row) return;
+    const step = () => (row.querySelector('.case')?.offsetWidth || 300) + 14;
+    document.getElementById('cprev').onclick = () => row.scrollBy({ left: -step() });
+    document.getElementById('cnext').onclick = () => row.scrollBy({ left: step() }); })();
 </script>
 </body>
 </html>
