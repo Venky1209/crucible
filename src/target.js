@@ -1,4 +1,4 @@
-import { chat } from './llm.js';
+import { chat, llmContext } from './llm.js';
 import { endpointReply } from './endpoint.js';
 import { voiceTargetReply } from './voice-target.js';
 
@@ -135,5 +135,11 @@ export async function targetReply(target, history) {
   if (target && target.mode === 'voice') return (await voiceTargetReply(target, history)).text;
   if (target && target.mode === 'endpoint') return endpointReply(target, history);
   const system = typeof target === 'string' ? target : target.prompt;
-  return chat(history, { system, maxTokens: 800, temperature: 0.7 });
+  // v2: a prompt target can name its own model, so a study can vary ONLY the agent's model
+  // while the attackers and the judge stay fixed.
+  if (target && target.provider) {
+    return llmContext.run({ provider: target.provider, model: target.model, key: target.key, base: target.base },
+      () => chat(history, { system, maxTokens: 800, temperature: 0.7 }));
+  }
+  return chat(history, { system, maxTokens: 800, temperature: 0.7, model: target?.model });
 }

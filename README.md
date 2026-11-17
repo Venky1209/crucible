@@ -191,11 +191,13 @@ prefix** — the one everybody gets wrong.
 ## Running it
 
 ```bash
-pnpm install
+pnpm install             # or npm install
 cp .env.example .env     # add one free API key
 pnpm models              # confirm which model ids your key can actually see
 pnpm smoke               # the gate: one attack, printed to the console
 pnpm dev                 # http://localhost:3100
+npm test                 # offline tests, no key needed
+LLM_PROVIDER=mock node server.js   # the whole UI on a scripted model, no key needed
 ```
 
 Standalone agents to attack, so a demo needs no external dependency:
@@ -223,6 +225,85 @@ customers do it mid-sentence constantly.
 
 ---
 
+## v2: numbers you can defend
+
+The hackathon build answered "can it break this agent?" with one conversation per attacker. One
+conversation between two stochastic models proves little, so v2 measures instead of anecdotes.
+
+### Repeated trials, with honest error bars
+
+Each attacker runs several times. Crucible reports the **attack success rate** with a **95% Wilson
+interval** (it stays truthful at small samples, where the textbook formula claims certainty it
+doesn't have), **pass^k** (the share of attackers the agent held against in *every* trial, the
+consistency measure from [tau-bench](https://arxiv.org/abs/2406.12045)), and a **resistance score**
+from 0 to 100 to track across prompt versions.
+
+```
+Resistance 0/100 · attack success 100% (95% CI 61–100%) · pass^3 0%
+  The Social Engineer     3/3    100%  CI 43.8–100%
+  The Policy Liar         3/3    100%  CI 43.8–100%
+```
+
+Held 0 of 2? The interval is still 0–66%. Crucible prints that, so nobody ships on luck.
+
+### A judge you can check
+
+- **Jury mode** (`--votes 3`): the transcript is judged three times at different temperatures. A
+  failure stands only if a majority found it *and each one quoted the agent verbatim*, checked in
+  code. Agreement is reported, so a 2-of-3 finding reads differently from a 3-of-3 one.
+- **Calibration** (`npm run calibrate`): the judge is scored against hand-labelled transcripts in
+  `calibration/set.json` (clear failures, clear passes, and close calls such as an agent that
+  *notes* a request without acting on it). It reports precision, recall and every miss. Run it when
+  you change the judge prompt or model.
+- **Verification-first fixes.** Prescribed prompt lines tell the agent what proof to ask for and
+  through which channel, rather than to refuse. Multi-turn persuasion research found
+  verification-seeking defends better than explicit refusal ([AREG, ICML 2026](https://icml.cc/virtual/2026/80201)).
+
+### In your CI
+
+```bash
+node --env-file=.env cli.js --prompt agent-prompt.md --attackers all --trials 3 --max-asr 10 --out crucible-report
+```
+
+Writes `report.md` and `report.json`, and **exits 1 when the attack success rate is above
+`--max-asr`**, so a pull request that weakens the agent's prompt fails its build. A ready workflow
+is in `docs/github-action.yml`. `--endpoint <url> --authorised` tests a deployed agent instead.
+
+### Which models fold to which principle
+
+```bash
+node --env-file=.env study.js --models "openai:llama-3.3-70b-versatile,gemini:gemini-2.5-flash" --target northwind --attackers all --trials 3
+```
+
+Only the **agent's** model changes; attackers and judge stay fixed, so the comparison is fair. It
+writes a table of resistance per model and attack success per persuasion principle. Prior work
+found models differ sharply in resistance to persuasion ([Persuade Me If You Can, CAIS 2026](https://www.caisconf.org/program/2026/papers/persuade-me-if-you-can-a-framework-for-evaluating-persuasion-effectiveness-and-s/)); this measures it for support-agent policy, where we found no published benchmark.
+
+### Offline mode and tests
+
+`LLM_PROVIDER=mock` runs everything, UI included, with a scripted model and no API calls.
+`npm test` runs the offline suite: interval maths, trial roll-ups, the jury, the report, and the CI
+exit codes.
+
+### Hosting, and bring your own key
+
+`/api/run-stream` runs and streams in one response (newline-delimited JSON with a heartbeat), so
+Crucible deploys as a single serverless function. On a hosted deployment, runs on the server's key
+are capped (3 attackers, 2 trials, 4 turns); a visitor can paste their own Groq, Gemini, OpenRouter
+or OpenAI key under *Use your own model key* to lift the caps. The key stays in their browser and
+travels only with their run; the server never stores it.
+
+### Where this sits
+
+| Work | What it tests | Difference |
+|---|---|---|
+| Garak, PyRIT, Promptfoo red-teaming | Whether an *attacker* can break the model: jailbreaks, injection, leakage | Crucible tests whether a *plausible customer* can persuade an agent to break business policy |
+| [TRAP](https://arxiv.org/pdf/2512.23128) | Persuasion principles injected into web pages against web agents | Crucible holds a live multi-turn conversation with a support agent |
+| [AREG](https://icml.cc/virtual/2026/80201) | Persuasion and resistance in a negotiation game | Crucible scores policy adherence in customer support, with fixes |
+| [tau-bench](https://arxiv.org/abs/2406.12045) | Task success and policy adherence with a cooperative simulated user | Crucible's simulated user is adversarial on purpose, and uses tau2-bench policies as its control |
+
+---
+
 ## Honest limitations
 
 - **The attack strategies are hand-authored.** They implement published
@@ -236,6 +317,10 @@ customers do it mid-sentence constantly.
   testing tool-using agents; we haven't.
 - **Rate limits bound a run.** Free-tier TPM is the real constraint, so runs use a
   subset of the library rather than all 14 at once.
+- **Statistics are only as good as the trial count.** Three trials give wide
+  intervals; the reports say so rather than hide it.
+- **The calibration set is small and hand-written.** It catches a judge that cries
+  wolf; it is not a benchmark of judge accuracy.
 - **This is not a new category.** Adaptive red-teaming and closed-loop remediation
   are the 2026 standard. What's rare is the control group.
 
@@ -251,9 +336,15 @@ src/target.js        target runner + the tau2-bench benchmark target
 src/endpoint.js      live-agent client, 10 request shapes, 13 platform presets
 src/voice.js         ElevenLabs TTS + Sarvam STT
 src/voice-target.js  the spoken attack loop
-src/judge.js         taxonomy, quote enforcement, fix prescription
-src/run.js           orchestration, concurrency, escalation context
-server.js            express + SSE
+src/judge.js         taxonomy, quote enforcement, jury, fix prescription
+src/run.js           orchestration, trials, concurrency, escalation context
+src/stats.js         attack success rate, Wilson intervals, pass^k, resistance score
+src/report.js        Markdown and JSON reports
+server.js            express: streaming runs, bring-your-own-key, hosted caps
+cli.js               command line and CI gate (--max-asr)
+calibrate.js         scores the judge against calibration/set.json
+study.js             compares agent models by persuasion principle
+test/                offline tests on the mock model (npm test)
 public/              single-page interface + WebGL agent avatars
 mock-agent.js        a standalone HTTP agent to attack
 mock-voice-agent.js  a standalone voice agent to attack

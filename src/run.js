@@ -8,39 +8,50 @@ export const TURNS_PER_ATTACK = Number(process.env.TURNS || 4);
  * Run one adversary against the target for N exchanges.
  * onEvent({type, ...}) fires per turn so the UI can fill in live.
  */
-export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, onEvent = () => {}, ctx = {} } = {}) {
+export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, onEvent = () => {}, ctx = {}, trial = 1, votes = 1 } = {}) {
   const transcript = [];   // canonical: [{ role: 'adversary' | 'target', content }]
   const tgtView = [];      // the target's own message list (it is the 'assistant')
 
-  onEvent({ type: 'attack_start', adversaryId: adversary.id });
+  onEvent({ type: 'attack_start', adversaryId: adversary.id, trial });
 
   for (let i = 0; i < turns; i++) {
     const attack = await adversaryReply(adversary, transcript, ctx);
     transcript.push({ role: 'adversary', content: attack });
     tgtView.push({ role: 'user', content: attack });
-    onEvent({ type: 'turn', adversaryId: adversary.id, role: 'adversary', content: attack, index: transcript.length });
+    onEvent({ type: 'turn', adversaryId: adversary.id, role: 'adversary', content: attack, index: transcript.length, trial });
 
     const reply = await targetReply(target, tgtView);
     transcript.push({ role: 'target', content: reply });
     tgtView.push({ role: 'assistant', content: reply });
-    onEvent({ type: 'turn', adversaryId: adversary.id, role: 'target', content: reply, index: transcript.length });
+    onEvent({ type: 'turn', adversaryId: adversary.id, role: 'target', content: reply, index: transcript.length, trial });
   }
 
-  const verdict = await judgeTranscript(transcript, adversary);
-  onEvent({ type: 'verdict', adversaryId: adversary.id, verdict });
-  return { adversary, transcript, verdict };
+  const verdict = await judgeTranscript(transcript, adversary, { votes });
+  onEvent({ type: 'verdict', adversaryId: adversary.id, verdict, trial });
+  return { adversary, transcript, verdict, trial };
 }
 
-/** Run several adversaries at once, capped so a free tier does not 429 mid-demo. */
-export async function runAll(adversaries, target, { concurrency = 2, onEvent = () => {}, turns, ctx = {} } = {}) {
+/**
+ * Run several adversaries, each `trials` times, capped so a free tier does not 429 mid-demo.
+ * Trials of one attacker run one after another; attackers in a wave run side by side.
+ */
+export async function runAll(adversaries, target, { concurrency = 2, onEvent = () => {}, turns, ctx = {}, trials = 1, votes = 1 } = {}) {
   const results = [];
   for (let i = 0; i < adversaries.length; i += concurrency) {
     const wave = adversaries.slice(i, i + concurrency);
-    results.push(...(await Promise.all(wave.map((a) =>
-        runAttack(a, target, { turns, onEvent, ctx: { ...ctx, ...(ctx.per?.[a.id] || {}) } })))));
+    const done = await Promise.all(wave.map(async (a) => {
+      const mine = [];
+      for (let t = 1; t <= trials; t++) {
+        mine.push(await runAttack(a, target, { turns, onEvent, trial: t, votes, ctx: { ...ctx, ...(ctx.per?.[a.id] || {}) } }));
+      }
+      return mine;
+    }));
+    results.push(...done.flat());
   }
   return results;
 }
+
+export { summarize } from './stats.js';
 
 /** Group failures by mode - the judge already labelled them, so no clustering needed. */
 export function groupFailures(results) {

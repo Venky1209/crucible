@@ -2,9 +2,9 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { LIBRARY, ADVERSARIES } from './src/adversaries.js';
 import { DEFAULT_TARGET_PROMPT, TARGETS } from './src/target.js';
-import { runAll, groupFailures, TURNS_PER_ATTACK } from './src/run.js';
+import { runAll, groupFailures, summarize, TURNS_PER_ATTACK } from './src/run.js';
 import { FAILURE_MODES } from './src/judge.js';
-import { providerLabel, limits } from './src/llm.js';
+import { providerLabel, limits, usage, llmContext } from './src/llm.js';
 import { STYLES, PLATFORMS, parseHeaders, validateUrl, probeEndpoint } from './src/endpoint.js';
 import { voiceReady, renderTranscript } from './src/voice.js';
 import { voiceModeReady, voiceModeStatus } from './src/voice-target.js';
@@ -36,6 +36,7 @@ app.get('/api/config', (_req, res) => {
     styles: Object.entries(STYLES).map(([id, v]) => ({ id, label: v.label })),
     platforms: PLATFORMS,
     provider: providerLabel(),
+    hosted: HOSTED, caps: CAPS,
     voice: voiceReady(),
     voiceMode: voiceModeStatus(),
   });
@@ -188,6 +189,75 @@ app.post('/api/run', (req, res) => {
     });
 });
 
+// ── v2: one-request streaming run ────────────────────────────────────────────
+// The run above keeps state in memory between two requests, which breaks on serverless hosts where
+// each request can land on a different machine. This endpoint runs and streams in ONE response as
+// newline-delimited JSON, with a heartbeat so idle proxies don't close it.
+//
+// Bring your own key: x-crucible-key / x-crucible-provider / x-crucible-model / x-crucible-base apply
+// to this request only. Without one, a hosted deployment (HOSTED=1) runs on the server's key with caps.
+const HOSTED = process.env.HOSTED === '1' || Boolean(process.env.VERCEL);
+const CAPS = { attackers: 3, turns: 4, trials: 2, votes: 1 };
+
+app.post('/api/run-stream', async (req, res) => {
+  const body = req.body || {};
+  const own = req.get('x-crucible-key')
+    ? { key: req.get('x-crucible-key'), provider: req.get('x-crucible-provider') || 'openai',
+        model: req.get('x-crucible-model') || undefined, base: req.get('x-crucible-base') || undefined }
+    : null;
+  if (own && own.base) {
+    try { validateUrl(own.base); } catch (err) { return res.status(400).json({ error: 'Bad base URL: ' + err.message }); }
+  }
+  const capped = HOSTED && !own;
+  let chosen = (body.adversaryIds?.length ? body.adversaryIds : ADVERSARIES.map((a) => a.id))
+    .map((id) => LIBRARY.find((a) => a.id === id)).filter(Boolean);
+  let trials = Math.max(1, Math.min(10, Number(body.trials) || 1));
+  let votes = [1, 3].includes(Number(body.votes)) ? Number(body.votes) : 1;
+  let turns = Math.max(2, Math.min(8, Number(body.turns) || TURNS_PER_ATTACK));
+  if (capped) {
+    chosen = chosen.slice(0, CAPS.attackers);
+    trials = Math.min(trials, CAPS.trials); votes = CAPS.votes; turns = Math.min(turns, CAPS.turns);
+  }
+  let target;
+  try { target = buildTarget(body); } catch (err) { return res.status(400).json({ error: err.message }); }
+  if (!chosen.length) return res.status(400).json({ error: 'pick at least one adversary' });
+
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  const write = (e) => res.write(JSON.stringify(e) + '\n');
+  const beat = setInterval(() => write({ type: 'heartbeat' }), 10000);
+  write({ type: 'start', capped, trials, votes, turns,
+    adversaries: chosen.map(({ id, name, blurb, goal, color, icon, tagline, principle }) => ({ id, name, blurb, goal, color, icon, tagline, principle })) });
+
+  const { round = 1, baselinePrompt, prior } = body;
+  const defences = defencesAdded(baselinePrompt, body.targetPrompt);
+  const ctx = { round: Number(round) || 1, defences,
+    per: Object.fromEntries(chosen.map((a) => [a.id, { priorOpening: prior?.[a.id]?.opening, priorOutcome: prior?.[a.id]?.outcome }])) };
+  const before = usage.calls;
+  try {
+    const results = await llmContext.run(own || {}, () => runAll(chosen, target, { onEvent: write, ctx, trials, votes, turns }));
+    write({
+      type: 'done',
+      summary: summarize(results),
+      groups: groupFailures(results).map((g) => ({
+        mode: g.mode, count: g.count,
+        items: g.items.map((r) => ({ adversaryId: r.adversary.id, adversaryName: r.adversary.name, trial: r.trial,
+          evidence: r.verdict.evidence, why: r.verdict.why, severity: r.verdict.severity, jury: r.verdict.jury || null,
+          standard: FAILURE_MODES[r.verdict.mode]?.standard || null, fix: r.verdict.fix, transcript: r.transcript })),
+      })),
+      total: results.length, failed: results.filter((r) => r.verdict.failed).length, round: ctx.round, defences,
+      openings: Object.fromEntries(results.map((r) => [r.adversary.id, {
+        opening: r.transcript.find((t) => t.role === 'adversary')?.content?.slice(0, 120),
+        outcome: r.verdict.failed ? `you succeeded via ${r.verdict.mode}` : 'the agent held; that route is closed' }])),
+      calls: usage.calls - before,
+    });
+  } catch (err) {
+    write({ type: 'error', message: err.message });
+  } finally {
+    clearInterval(beat);
+    res.end();
+  }
+});
+
 app.get('/api/events/:runId', (req, res) => {
   const run = runs.get(req.params.runId);
   if (!run) return res.status(404).end();
@@ -212,8 +282,10 @@ app.get('/api/events/:runId', (req, res) => {
   req.on('close', () => { clearInterval(beat); run.listeners.delete(write); });
 });
 
+// On Vercel the app is exported and served as one function; locally it listens.
+export default app;
 const port = process.env.PORT || 3100;
-app.listen(port, () => {
+if (!process.env.VERCEL) app.listen(port, () => {
   console.log(`\n  CRUCIBLE  ->  http://localhost:${port}`);
   console.log(`  ${providerLabel()}  ${TURNS_PER_ATTACK} turns/attack\n`);
 });

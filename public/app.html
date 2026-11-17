@@ -397,6 +397,18 @@
   .err{background:var(--alarm-soft);border:1px solid #edc4c8;color:#8c1626;padding:12px 15px;
        border-radius:10px;margin-bottom:14px;font-size:13.5px;display:none}
   @media(max-width:1080px){.wrap{grid-template-columns:1fr}.rail{position:static;max-height:none}}
+
+  /* v2: trials, judge votes, bring-your-own-key, statistics */
+  .runopts{display:flex;gap:10px;margin-top:12px}
+  .runopts label{flex:1;font-size:11.5px;color:var(--dim);display:flex;flex-direction:column;gap:4px}
+  .runopts select,.keybox select,.keybox input{width:100%;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font:12.5px var(--sans,system-ui)}
+  .keybox{margin-top:10px;font-size:12px;color:var(--dim)}
+  .keybox summary{cursor:pointer;color:var(--ink2)}
+  .keybox select,.keybox input{margin-top:6px}
+  .keynote{margin-top:6px;font-size:11px;color:var(--faint)}
+  .trialsep{margin:10px 0 6px;font:11px/1 var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.08em;border-top:1px dashed var(--line2);padding-top:8px}
+  .statline{font:11.5px/1.3 var(--mono);color:var(--ink2);padding:6px 11px;border:1px solid var(--line2);border-radius:20px;background:var(--card)}
+  .statline b{color:var(--clay-deep)}
 </style>
 </head>
 <body>
@@ -520,6 +532,16 @@
         <div class="fact"><span>Est. duration</span><b id="f-d">~65s</b></div>
         <div class="fact"><span>Model</span><b id="f-model" style="font-size:11px">—</b></div>
       </div>
+      <div class="runopts">
+        <label>Trials <select id="trials" title="Run each attacker several times. One conversation proves little; rates with intervals don't lie."><option value="1">1</option><option value="3">3</option><option value="5">5</option></select></label>
+        <label>Judge <select id="votes" title="3 votes: a failure needs a majority, each with a verbatim quote."><option value="1">1 vote</option><option value="3">3 votes</option></select></label>
+      </div>
+      <details class="keybox"><summary>Use your own model key</summary>
+        <select id="k-prov"><option value="openai|https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq (free)</option><option value="gemini||gemini-2.5-flash">Google Gemini</option><option value="openai|https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct">OpenRouter</option><option value="openai|https://api.openai.com/v1|gpt-4o-mini">OpenAI</option></select>
+        <input id="k-key" type="password" placeholder="API key" autocomplete="off">
+        <input id="k-model" placeholder="Model (optional)">
+        <div class="keynote">Stays in this browser and goes only with your run. Lifts the demo limits.</div>
+      </details>
       <div style="margin-top:13px"><button class="btn" id="go">Attack agent</button></div>
       <div class="status" id="status">Ready</div>
     </div></div>
@@ -804,7 +826,8 @@ function pickTarget(i){
 const picked = () => [...document.querySelectorAll('#roster input:checked')].map(i=>i.value);
 
 function profile(){
-  const n = picked().length, calls = n*CFG.turns*2 + n;
+  const tr = Number($('#trials')?.value)||1, vo = Number($('#votes')?.value)||1;
+  const n = picked().length, calls = (n*CFG.turns*2 + n*vo) * tr;
   $('#f-a').textContent=n; $('#f-t').textContent=CFG.turns;
   $('#f-m').textContent=calls; $('#f-d').textContent='~'+Math.round(calls*3.6)+'s';
   $('#picked').textContent = n ? `· ${n} selected` : '· none selected';
@@ -828,12 +851,37 @@ async function attack(){
 
   if (baselinePrompt === null) baselinePrompt = $('#prompt').value;
   round += 1;
-  const r = await fetch('/api/run',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({ ...targetPayload(), adversaryIds:ids,
-      round, baselinePrompt, prior: LAST?.openings || null })});
-  const { runId, adversaries, error } = await r.json();
-  if (error) return fail(error);
+  // v2: one streaming request (works on serverless hosts), with optional bring-your-own-key headers.
+  const ctrl = new AbortController();
+  stream = { close: () => ctrl.abort() };
+  let r;
+  try {
+    r = await fetch('/api/run-stream',{method:'POST',signal:ctrl.signal,headers:{'content-type':'application/json',...keyHeaders()},
+      body:JSON.stringify({ ...targetPayload(), adversaryIds:ids, round, baselinePrompt, prior: LAST?.openings || null,
+        trials:Number($('#trials').value)||1, votes:Number($('#votes').value)||1 })});
+  } catch (err) { return fail(err.message); }
+  if (!r.ok) { const j = await r.json().catch(()=>({ error:'HTTP '+r.status })); return fail(j.error || 'Run failed'); }
+  try {
+    for await (const e of ndjson(r)) {
+      if (e.type==='start') columns(e.adversaries, e);
+      else if (e.type!=='heartbeat') handle(e);
+    }
+  } catch (err) { if (err.name!=='AbortError') fail(err.message); }
+  if (running) finish();
+}
 
+async function* ndjson(r){
+  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream:true });
+    let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0,i).trim(); buf = buf.slice(i+1); if (line) yield JSON.parse(line); }
+  }
+  if (buf.trim()) yield JSON.parse(buf);
+}
+
+function columns(adversaries, info){
+  if (info.capped) $('#status').textContent = `Demo limits: ${adversaries.length} attackers, ${info.trials} trial(s), ${info.turns} turns. Add your own key for full runs.`;
   $('#setup').classList.add('folded');
   $('#idle').style.display='none';
   for (const av of live.values()) av.dispose();
@@ -854,13 +902,13 @@ async function attack(){
     av.set('working'); live.set(a.id, av);
   }
   $('#board').innerHTML = '<span>attack in progress</span>';
-
-  stream = new EventSource('/api/events/'+runId);
-  stream.onmessage = m => handle(JSON.parse(m.data));
-  stream.onerror = () => { stream.close(); finish(); };
 }
 
 function handle(e){
+  if (e.type==='attack_start' && e.trial>1){
+    const box=$('#t-'+e.adversaryId); if(!box) return;
+    const d=document.createElement('div'); d.className='trialsep'; d.textContent='Trial '+e.trial; box.appendChild(d);
+  }
   if (e.type==='turn'){
     const box=$('#t-'+e.adversaryId); if(!box) return;
     const atk = e.role==='adversary';
@@ -897,6 +945,7 @@ function render(e){
       ? `<em>${e.failed}</em> of ${e.total} attacks got through`
       : `<em>0</em> of ${e.total} attacks got through — this agent held`}</div>
     ${delta}
+    ${e.summary?`<span class="statline" title="Wilson 95% interval. pass^k = share of attackers held in every trial (tau-bench).">resistance <b>${e.summary.resistance}/100</b> · success ${e.summary.asr}% (95% CI ${e.summary.ci[0]}–${e.summary.ci[1]}%) · pass^${e.summary.passK.k} ${e.summary.passK.value}%</span>`:''}
     ${e.round>1?`<span class="roundtag">round ${e.round} — attackers adapted to your fix</span>`:''}
     <div class="sp"></div>
     ${fixes.length?`<button class="btn ap sm" id="applyall">Apply all ${fixes.length} fixes</button>`:''}
@@ -1060,6 +1109,20 @@ function finish(){
   profile(); $('#status').textContent='Apply a fix, then re-run to prove it worked.';
 }
 $('#stop').addEventListener('click',()=>{ stream?.close(); $('#status').textContent='Stopped.'; finish(); });
+// Bring your own key: kept in this browser (localStorage), sent as headers with each run only.
+const KEYS = 'crucible-own-key';
+function keyHeaders(){
+  const k = $('#k-key').value.trim(); if (!k) return {};
+  const [provider, base, dflt] = $('#k-prov').value.split('|');
+  const h = { 'x-crucible-key': k, 'x-crucible-provider': provider, 'x-crucible-model': $('#k-model').value.trim() || dflt };
+  if (base) h['x-crucible-base'] = base;
+  return h;
+}
+try { const s = JSON.parse(localStorage.getItem(KEYS)||'null'); if (s) { $('#k-prov').value = s.p; $('#k-key').value = s.k; $('#k-model').value = s.m||''; } } catch {}
+for (const id of ['k-prov','k-key','k-model']) $('#'+id).addEventListener('change', () => {
+  try { localStorage.setItem(KEYS, JSON.stringify({ p:$('#k-prov').value, k:$('#k-key').value.trim(), m:$('#k-model').value.trim() })); } catch {}
+});
+for (const id of ['trials','votes']) $('#'+id).addEventListener('change', profile);
 $('#go').addEventListener('click',attack);
 boot();
 </script>

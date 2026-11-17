@@ -1,0 +1,29 @@
+# Copy to .github/workflows/crucible.yml in the repo that holds your agent's system prompt.
+# Fails the pull request when Crucible's attack success rate goes above the gate.
+# Needs a repository secret LLM_API_KEY (a free Groq key works).
+name: Crucible
+on:
+  pull_request:
+    paths: ["prompts/**"]
+jobs:
+  persuasion-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: Venky1209/crucible, path: crucible }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci --omit=dev || npm install --omit=dev
+        working-directory: crucible
+      - name: Attack the agent
+        working-directory: crucible
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_PROVIDER: openai
+          LLM_BASE_URL: https://api.groq.com/openai/v1
+          LLM_MODEL: llama-3.3-70b-versatile
+        run: node cli.js --prompt ../prompts/support-agent.md --attackers all --trials 3 --max-asr 10 --out ../crucible-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: crucible-report, path: crucible-report }
