@@ -279,6 +279,28 @@ Only the **agent's** model changes; attackers and judge stay fixed, so the compa
 writes a table of resistance per model and attack success per persuasion principle. Prior work
 found models differ sharply in resistance to persuasion ([Persuade Me If You Can, CAIS 2026](https://www.caisconf.org/program/2026/papers/persuade-me-if-you-can-a-framework-for-evaluating-persuasion-effectiveness-and-s/)); this measures it for support-agent policy, where we found no published benchmark.
 
+### Any website chat, from just the link
+
+```bash
+node --env-file=.env cli.js --url https://your-site.com/support --authorised --trials 3 --out report
+```
+
+Browser mode tests the chat the way a customer meets it: Crucible opens the page in a real browser,
+finds the chat, types each attack and reads the reply. **No API key for the agent is needed.** It
+finds the chat with a saved recipe for the site, the widget's own open call (Intercom, Crisp, Tidio,
+HubSpot, Drift, Zendesk, Freshchat, LiveChat, Botpress, Voiceflow), generic detection of the message
+box in any frame or open shadow root, a click on the launcher, and finally an AI fallback that saves a
+recipe. It **stops the moment the bot hands over to a human**, so real support staff never receive
+red-team traffic, and it refuses bot-protection walls. `--headed` lets you watch;
+`--input '<css>'` and `--launcher '<css>'` cover anything detection misses.
+
+**What is proven and what isn't** lives in [COMPATIBILITY.md](COMPATIBILITY.md), produced by
+`node compat.js`: six widget patterns pass today, including the real Flowise, n8n chat and Deep Chat
+embeds; the commercial widgets are coded but unproven until tested on an account you own.
+
+Only test chats you own or have written permission to test. A persuaded production bot can take real
+actions.
+
 ### Offline mode and tests
 
 `LLM_PROVIDER=mock` runs everything, UI included, with a scripted model and no API calls.

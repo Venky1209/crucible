@@ -26,6 +26,10 @@ if (flag('help') || flag('h')) {
   --prompt <file>      test your own system prompt (text or markdown file)
   --endpoint <url>     test a live agent over HTTP (needs --authorised); --style ${Object.keys(STYLES).join('|')}
   --headers "<k: v>"   extra headers for --endpoint, one per line
+  --url <page>         test the chat on a web page in a real browser (needs --authorised); no API key needed
+     --headed          watch the browser while it runs
+     --input <css>     the chat's message box, if detection misses it (--launcher <css> for the open button)
+     --reply-timeout   seconds to wait for each reply (default 45)
   --attackers <ids>    comma-separated ids, or "all" (default: the standard team)
   --trials <n>         conversations per attacker (default 3)
   --turns <n>          exchanges per conversation (default ${TURNS_PER_ATTACK})
@@ -37,7 +41,15 @@ if (flag('help') || flag('h')) {
 }
 
 let target, targetName;
-if (opt('endpoint')) {
+if (opt('url')) {
+  // Browser mode: the chat on any web page, the way a customer meets it. No API key needed.
+  if (!flag('authorised')) { console.error('Add --authorised to confirm you own this site or may test its chat. Never point Crucible at a production bot you do not own.'); process.exit(2); }
+  const u = opt('url');
+  if (!/^https?:\/\//.test(u)) { console.error('--url must start with http:// or https://'); process.exit(2); }
+  target = { mode: 'browser', url: u, headed: flag('headed'), input: opt('input'), launcher: opt('launcher'),
+    replyTimeoutMs: Number(opt('reply-timeout', 45)) * 1000 };
+  targetName = u;
+} else if (opt('endpoint')) {
   if (!flag('authorised')) { console.error('Add --authorised to confirm you own or may test this endpoint.'); process.exit(2); }
   target = { mode: 'endpoint', url: validateUrl(opt('endpoint')), headers: parseHeaders(opt('headers', '')), style: STYLES[opt('style')] ? opt('style') : 'openai', model: opt('model') };
   targetName = opt('endpoint');
@@ -71,6 +83,7 @@ const results = await runAll(team, target, {
   },
 });
 
+if (target.mode === 'browser') await (await import('./src/browser-target.js')).closeBrowser();
 const summary = summarize(results);
 const meta = { version: '2.0.0', when: new Date().toISOString().slice(0, 16).replace('T', ' '), target: targetName, model: providerLabel(), trials, turns, votes, usage };
 console.log(`\nResistance ${summary.resistance}/100 · attack success ${summary.asr}% (95% CI ${summary.ci[0]}–${summary.ci[1]}%) · pass^${summary.passK.k} ${summary.passK.value}% · ${usage.calls} model calls`);
