@@ -206,6 +206,9 @@
   .assume{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
   .assume summary{cursor:pointer;font-size:13px;color:var(--clay-deep);font-weight:600}
   .assume label{margin-top:12px}
+
+  .calc select{width:100%;max-width:260px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--paper);font:600 14px var(--sans);color:var(--ink)}
+  .calc small.rough{color:var(--faint)}
 </style>
 </head>
 <body>
@@ -303,24 +306,30 @@
     <div class="calc" id="calc">
       <div class="calc-in">
         <p class="kicker" style="margin:0 0 4px">What it could mean for you</p>
+        <label>Your business
+          <select id="cInd">
+            <option value="shop">Online shop</option><option value="airline">Airline or travel</option>
+            <option value="fintech">Bank or fintech</option><option value="car">Car dealer</option>
+            <option value="insurance">Insurance</option><option value="saas">Subscription software</option>
+          </select><small class="rough">Rough starting points to show the shape, not industry data. Put in your own.</small></label>
         <label>Your yearly revenue <b class="rev" id="cRevLabel">$10M</b>
           <input type="range" id="cRev" min="0" max="100" value="50" aria-label="Yearly revenue"></label>
         <div class="ticks"><span>$100K</span><span>$1M</span><span>$10M</span><span>$100M</span><span>$1B</span></div>
         <details class="assume"><summary>Change the assumptions</summary>
-          <label>Average order value<span class="u">$<input type="number" id="cAov" value="60" min="1" step="5"></span></label>
-          <label>Support chats per 100 orders<span class="u"><input type="number" id="cContact" value="10" min="0" max="100" step="1"></span>
-            <small>Published figures range from 2 to 46 depending on what you sell.</small></label>
+          <label><span id="cAovLabel">Average order value</span><span class="u">$<input type="number" id="cAov" value="60" min="1" step="5" style="width:150px"></span></label>
+          <label><span>Support chats per 100 <span id="cUnit">orders</span></span><span class="u"><input type="number" id="cContact" value="10" min="0" max="100" step="1"></span>
+            <small id="cContactNote">Published figures for online shops range from 2 to 46.</small></label>
           <label>Customers who push for something they shouldn't get<span class="u"><input type="number" id="cPush" value="1" min="0" max="100" step="0.5">%</span></label>
           <label>Times your bot gives in<span class="u"><input type="number" id="cFold" value="20" min="0" max="100" step="5">%</span>
             <small>Crucible measures this for your bot.</small></label>
           <label>Value of each wrong yes<span class="u">$<input type="number" id="cVal" value="60" min="0" step="5"></span>
-            <small>Default: one refunded order.</small></label>
+            <small id="cValHint">Default: one refunded order.</small></label>
         </details>
       </div>
       <div class="calc-out">
         <div class="calc-big" id="cYear">$2,000</div>
         <div class="calc-l">given away a year · <span id="cPct">0.02%</span> of revenue</div>
-        <div class="calc-yr">From <b id="cTimes">33</b> conversations a year that end with a yes your policy never allowed.</div>
+        <div class="calc-yr">From <b id="cTimes">33</b> <span id="cNoun">conversations</span> a year that end with a yes your policy never allowed.</div>
         <div class="calc-yr">If the trick gets shared and five times as many people try it: <b id="cSpread">$10,000</b> a year.</div>
         <div class="calc-plus">For most shops the everyday leak is modest. The expensive part is the single big yes: a $7,000
           buy-back offer (BMW Toronto) or a court ruling (Air Canada). Crucible finds those conversations before a customer does.</div>
@@ -341,9 +350,10 @@
       <div>
         <h4>Gap 1 · One good run proves little</h4>
         <div class="big lo sm">61% → under 25%</div>
-        <small>In the τ-bench paper, GPT-4o solved about 61% of retail tasks on a single try, but
-          under 25% when it had to get the same task right in 8 separate attempts. An agent that
-          holds once can still fold the next time.</small>
+        <small>In the original τ-bench paper (2024), GPT-4o solved about 61% of retail tasks on a single
+          try, but under 25% when it had to get the same task right in 8 separate attempts. Newer models
+          score higher on a single try. The lesson stands: an agent that holds once can still fold the
+          next time, so one good run tells you little.</small>
       </div>
       <div>
         <h4>Gap 2 · The simulated customer isn't trying to persuade</h4>
@@ -357,7 +367,7 @@
     <p>So the number a company actually needs, <b>how often a polite, persistent customer gets the
       agent to break policy</b>, is not on any leaderboard. Crucible measures it for your agent:
       many conversations, an attack success rate with error bars, and the exact line that broke.</p>
-    <p class="srcline">Source for gap 1: Yao et al., <a href="https://arxiv.org/abs/2406.12045" target="_blank" rel="noopener">τ-bench</a>, ICLR 2025.</p>
+    <p class="srcline">Source for gap 1: Yao et al., <a href="https://arxiv.org/abs/2406.12045" target="_blank" rel="noopener">τ-bench</a>, ICLR 2025. Current results for newer models and newer versions of the benchmark (τ², with telecom) are on the <a href="https://taubench.com" target="_blank" rel="noopener">official leaderboard</a>.</p>
   </section>
 
   <section>
@@ -600,8 +610,25 @@
       $('cYear').textContent = money(lost);
       $('cPct').textContent = (100 * lost / r).toFixed(lost / r < 0.001 ? 3 : 2) + '%';
       $('cTimes').textContent = Math.round(yes).toLocaleString('en-US');
+      $('cNoun').textContent = Math.round(yes) === 1 ? 'conversation' : 'conversations';
       $('cSpread').textContent = money(lost * 5);
     }
+    // Illustrative presets: where one wrong yes is worth more than a refunded parcel.
+    const PRESETS = {
+      shop:      { label: 'Average order value', unit: 'orders', aov: 60, contact: 10, push: 1, val: 60, hint: 'One refunded order.' },
+      airline:   { label: 'Average ticket price', unit: 'bookings', aov: 400, contact: 20, push: 2, val: 250, hint: 'A waived change fee, or a refund the fare rules do not allow.' },
+      fintech:   { label: 'Yearly revenue per customer', unit: 'customers', aov: 150, contact: 30, push: 2, val: 40, hint: 'A waived fee or a goodwill credit.' },
+      car:       { label: 'Average sale', unit: 'sales', aov: 30000, contact: 60, push: 3, val: 2000, hint: "An offer or discount it had no authority to make. BMW Toronto's was $7,000." },
+      insurance: { label: 'Average yearly premium', unit: 'policies', aov: 1200, contact: 30, push: 2, val: 400, hint: 'Cover or a payout promised outside the policy.' },
+      saas:      { label: 'Average yearly plan', unit: 'customers', aov: 600, contact: 15, push: 2, val: 300, hint: 'A refund outside the refund window.' },
+    };
+    $('cInd').addEventListener('change', () => {
+      const p = PRESETS[$('cInd').value];
+      $('cAovLabel').textContent = p.label; $('cUnit').textContent = p.unit; $('cValHint').textContent = p.hint;
+      $('cContactNote').textContent = $('cInd').value === 'shop' ? 'Published figures for online shops range from 2 to 46.' : 'A rough guess. Use your own number.';
+      $('cAov').value = p.aov; $('cContact').value = p.contact; $('cPush').value = p.push; $('cVal').value = p.val;
+      calc();
+    });
     ['cRev', 'cAov', 'cContact', 'cPush', 'cFold', 'cVal'].forEach((id) => $(id).addEventListener('input', calc));
     calc();
   })();
