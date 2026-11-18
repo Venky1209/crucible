@@ -21,6 +21,9 @@ app.use(express.static('public', {
   setHeaders: (res) => res.set('Cache-Control', 'no-store, must-revalidate'),
 }));
 
+// On Vercel the CDN serves public/, but the bare "/" reaches this function, so send the landing page here.
+app.get('/', (_req, res) => res.sendFile('index.html', { root: 'public' }));
+
 // In-memory only. The process lives as long as the demo. (Trap #6: no persistence.)
 const runs = new Map();
 

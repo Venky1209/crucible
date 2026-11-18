@@ -308,6 +308,7 @@
     .rp-again{min-height:38px}
     .cbtn{width:44px;height:44px}
     .tab{min-height:40px}
+    .row .nm{flex-direction:column;align-items:flex-start;gap:3px}
   }
   @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.rp-m,.rp-n{animation:none}.rp-result{transition:none}html{scroll-behavior:auto}}
 </style>
@@ -781,7 +782,7 @@
       visible = e.isIntersecting; cancelAnimationFrame(raf); if (visible) raf = requestAnimationFrame(frame);
     }).observe(canvas);
   }
-  emberField(document.getElementById('heroField'), { strength: 1, slit: [innerWidth < 760 ? 0.5 : 0.76, innerWidth < 760 ? 0.3 : 0.54] });
+  emberField(document.getElementById('heroField'), { strength: 1, slit: [innerWidth < 760 ? 0.5 : 0.76, innerWidth < 760 ? 0.2 : 0.54] });
   emberField(document.getElementById('closeField'), { strength: 0.6, slit: [0.74, 0.78] });
 
   // The footer wordmark, drawn as a field of dots from the real letterforms.
