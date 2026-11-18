@@ -125,7 +125,7 @@ const ADAPTERS = {
 
   openai: {
     keyName: 'LLM_API_KEY',
-    defaultModel: 'llama-3.3-70b-versatile',
+    defaultModel: 'openai/gpt-oss-120b',
     base: () => (ctxOf().provider === 'openai' && ctxOf().base) || process.env.LLM_BASE_URL || 'https://api.groq.com/openai/v1',
     listUrl() { return `${this.base()}/models`; },
     listHeaders: () => ({ authorization: `Bearer ${keyFor(ADAPTERS.openai)}` }),

@@ -396,7 +396,32 @@
   .status{font-size:12.5px;color:var(--dim);margin-top:9px;text-align:center;min-height:18px}
   .err{background:var(--alarm-soft);border:1px solid #edc4c8;color:#8c1626;padding:12px 15px;
        border-radius:10px;margin-bottom:14px;font-size:13.5px;display:none}
-  @media(max-width:1080px){.wrap{grid-template-columns:1fr}.rail{position:static;max-height:none}}
+  @media(max-width:1080px){.wrap{grid-template-columns:minmax(0,1fr)}.rail{position:static;max-height:none}}
+  main{min-width:0}
+  /* Phones: one column everywhere, bigger tap targets, and 16px inputs so iOS does not zoom on focus. */
+  @media(max-width:700px){
+    header{padding:0 14px;gap:10px}
+    .board b{font-size:20px}
+    .wrap{padding:12px 12px 60px;gap:12px}
+    .modes{width:auto;flex-wrap:wrap}
+    .mode{flex:1 1 auto;padding:9px 12px;min-height:40px}
+    .row{gap:8px}
+    .rowlab{width:100%}
+    .tchip{min-height:40px}
+    .btn.sm{min-height:38px}
+    .cols{grid-template-columns:minmax(0,1fr)}
+    .targets{grid-template-columns:minmax(0,1fr)}
+    .runopts{flex-wrap:wrap}.runopts label{min-width:calc(50% - 5px)}
+    .gap{grid-template-columns:minmax(0,1fr)}.gt{grid-row:auto}
+    .setup-h .now{max-width:22ch}
+    textarea,input[type=text],input[type=url],input[type=password],input:not([type]),select{font-size:16px !important}
+    .scrim{padding:0}
+    .modal{border-radius:0;max-height:100vh;height:100%}
+    .m-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+    .m-list{max-height:34vh;border-right:0;border-bottom:1px solid var(--line)}
+    .keybox summary,details>summary{padding:10px 0}
+    .cbtn{min-width:40px;min-height:40px}
+  }
 
   /* v2: trials, judge votes, bring-your-own-key, statistics */
   .runopts{display:flex;gap:10px;margin-top:12px}
@@ -548,7 +573,7 @@
         <label>Judge <select id="votes" title="3 votes: a failure needs a majority, each with a verbatim quote."><option value="1">1 vote</option><option value="3">3 votes</option></select></label>
       </div>
       <details class="keybox"><summary>Use your own model key</summary>
-        <select id="k-prov"><option value="openai|https://api.groq.com/openai/v1|llama-3.3-70b-versatile">Groq (free)</option><option value="gemini||gemini-2.5-flash">Google Gemini</option><option value="openai|https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct">OpenRouter</option><option value="openai|https://api.openai.com/v1|gpt-4o-mini">OpenAI</option></select>
+        <select id="k-prov"><option value="openai|https://api.groq.com/openai/v1|openai/gpt-oss-120b">Groq (free)</option><option value="gemini||gemini-2.5-flash">Google Gemini</option><option value="openai|https://openrouter.ai/api/v1|meta-llama/llama-3.3-70b-instruct">OpenRouter</option><option value="openai|https://api.openai.com/v1|gpt-4o-mini">OpenAI</option></select>
         <input id="k-key" type="password" placeholder="API key" autocomplete="off">
         <input id="k-model" placeholder="Model (optional)">
         <div class="keynote">Stays in this browser and goes only with your run. Lifts the demo limits.</div>
@@ -602,6 +627,12 @@ const PHASES = ['opening…','probing…','pressing…','closing in…','holding
 
 async function boot(){
   CFG = await (await fetch('/api/config')).json();
+  // Hosted without a shared key: say so up front and open the key panel, instead of failing on Attack.
+  if (CFG.hosted && CFG.sharedKey === false) {
+    const kb = document.querySelector('.keybox'); kb.open = true;
+    kb.querySelector('summary').textContent = 'Add a model key to run (required here)';
+    kb.querySelector('.keynote').innerHTML = 'This public demo has no shared key. A Groq key is free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>. It stays in this browser and goes only with your run. Or run Crucible on your own machine.';
+  }
   $('#f-model').textContent = (CFG.provider||'').split(' @ ')[0].replace(/^openai - /,'');
 
   const card = (t,i) => `

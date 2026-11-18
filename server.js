@@ -4,7 +4,7 @@ import { LIBRARY, ADVERSARIES } from './src/adversaries.js';
 import { DEFAULT_TARGET_PROMPT, TARGETS } from './src/target.js';
 import { runAll, groupFailures, summarize, TURNS_PER_ATTACK } from './src/run.js';
 import { FAILURE_MODES } from './src/judge.js';
-import { providerLabel, limits, usage, llmContext } from './src/llm.js';
+import { providerLabel, providerReady, limits, usage, llmContext } from './src/llm.js';
 import { STYLES, PLATFORMS, parseHeaders, validateUrl, probeEndpoint } from './src/endpoint.js';
 import { voiceReady, renderTranscript } from './src/voice.js';
 import { voiceModeReady, voiceModeStatus } from './src/voice-target.js';
@@ -36,7 +36,7 @@ app.get('/api/config', (_req, res) => {
     styles: Object.entries(STYLES).map(([id, v]) => ({ id, label: v.label })),
     platforms: PLATFORMS,
     provider: providerLabel(),
-    hosted: HOSTED, caps: CAPS,
+    hosted: HOSTED, caps: CAPS, sharedKey: serverKeyReady(), liveTargets: !HOSTED || ALLOW_LIVE,
     voice: voiceReady(),
     voiceMode: voiceModeStatus(),
   });
@@ -106,6 +106,7 @@ app.post('/api/voice', async (req, res) => {
 
 /** Cheap round-trip so a bad URL fails in 2 seconds, not 4 turns in. */
 app.post('/api/probe', async (req, res) => {
+  if (HOSTED && !ALLOW_LIVE) return res.status(403).json({ error: 'The hosted demo tests prompts only. Probe live endpoints from your own machine with the CLI.' });
   try {
     const target = buildTarget({ ...req.body, mode: 'endpoint' });
     res.json(await probeEndpoint(target));
@@ -115,6 +116,8 @@ app.post('/api/probe', async (req, res) => {
 });
 
 app.post('/api/run', (req, res) => {
+  const blocked = hostedGuard(req, req.body);
+  if (blocked) return res.status(403).json({ error: blocked });
   const { adversaryIds } = req.body || {};
   const chosen = (adversaryIds?.length ? adversaryIds : ADVERSARIES.map((a) => a.id))
     .map((id) => LIBRARY.find((a) => a.id === id))
@@ -199,8 +202,40 @@ app.post('/api/run', (req, res) => {
 const HOSTED = process.env.HOSTED === '1' || Boolean(process.env.VERCEL);
 const CAPS = { attackers: 3, turns: 4, trials: 2, votes: 1 };
 
+// A public deployment tests PROMPTS only. Pointing a shared server at live agents or web pages would let
+// anyone send attack traffic to a bot they do not own, from our address, so those modes stay on the
+// visitor's own machine (the CLI) unless the operator opts in with ALLOW_HOSTED_ENDPOINTS=1.
+const ALLOW_LIVE = process.env.ALLOW_HOSTED_ENDPOINTS === '1';
+const PROVIDER_NAME = process.env.LLM_PROVIDER || 'openai';
+const serverKeyReady = () => PROVIDER_NAME === 'mock' || providerReady(PROVIDER_NAME);
+
+function unsafeBase(raw) {
+  let u; try { u = new URL(raw); } catch { return 'That base URL is not valid.'; }
+  const h = u.hostname.toLowerCase();
+  if (u.protocol !== 'https:') return 'The base URL must use https.';
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')
+    || /^[\d.]+$/.test(h) || h.includes(':') || !h.includes('.')) return 'The base URL must be a public provider address, not a local or IP address.';
+  return null;
+}
+
+/** Returns an error message when a hosted request is not allowed, else null. */
+function hostedGuard(req, body) {
+  if (!HOSTED) return null;
+  if ((body?.mode === 'endpoint' || body?.mode === 'voice') && !ALLOW_LIVE) {
+    return 'The hosted demo tests prompts only. To test a live agent or a website you own, run Crucible on your machine: node cli.js --endpoint <url> --authorised, or --url <page> --authorised.';
+  }
+  const base = req.get('x-crucible-base');
+  if (base) { const bad = unsafeBase(base); if (bad) return bad; }
+  if (!req.get('x-crucible-key') && !serverKeyReady()) {
+    return 'This demo has no shared model key right now. Add your own free key in the key panel: Groq keys are free at console.groq.com/keys.';
+  }
+  return null;
+}
+
 app.post('/api/run-stream', async (req, res) => {
   const body = req.body || {};
+  const blocked = hostedGuard(req, body);
+  if (blocked) return res.status(403).json({ error: blocked });
   const own = req.get('x-crucible-key')
     ? { key: req.get('x-crucible-key'), provider: req.get('x-crucible-provider') || 'openai',
         model: req.get('x-crucible-model') || undefined, base: req.get('x-crucible-base') || undefined }

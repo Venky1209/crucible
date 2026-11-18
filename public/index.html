@@ -300,6 +300,14 @@
     .chart-h{flex-direction:column;gap:6px}
     .rows,.axis,.axis-l{padding-left:18px;padding-right:18px}.axis{margin:10px 18px 0}
     pre.src{font-size:12.5px}
+    /* tap targets: at least ~40px tall on touch screens */
+    .btn{height:44px;padding:0 16px}
+    .fcols a{padding:9px 0;margin:0}
+    .cell a.src,.cfoot a{padding:12px 0;display:inline-block}
+    .assume summary{padding:12px 0}
+    .rp-again{min-height:38px}
+    .cbtn{width:44px;height:44px}
+    .tab{min-height:40px}
   }
   @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.rp-m,.rp-n{animation:none}.rp-result{transition:none}html{scroll-behavior:auto}}
 </style>
@@ -332,7 +340,7 @@
       <a class="btn solid" href="/app.html">Try it now <span class="ar">→</span></a>
       <a class="btn" href="#proof-s">See the evidence</a>
     </div>
-    <p class="note">Runs on a free API tier. No account.</p>
+    <p class="note">Runs on a free API tier. Bring a free Groq key, or run it on your machine.</p>
   </div>
 </section>
 
@@ -698,7 +706,7 @@
     <div class="fcols">
       <div>
         <a class="logo" href="/"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="1.5" y="1.5" width="21" height="21" fill="none" stroke="#eef0ec" stroke-width="1.6"/><path d="M1.5 15.5h21v7h-21z" fill="#ff6a2b"/></svg>crucible</a>
-        <div class="live"><i></i>Open source · runs on a free API tier</div>
+        <div class="live"><i></i>Runs on a free API tier</div>
         <div class="small">Built for The Great Agent Hackathon · Track 3, AI-Native Enterprise.</div>
       </div>
       <div><h5>Product</h5><a href="/app.html">Try it now</a><a href="#integrate">Integration</a><a href="#benchmark">Benchmark</a><a href="https://github.com/Venky1209/crucible" target="_blank" rel="noopener">GitHub</a></div>

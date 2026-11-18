@@ -272,7 +272,7 @@ is in `docs/github-action.yml`. `--endpoint <url> --authorised` tests a deployed
 ### Which models fold to which principle
 
 ```bash
-node --env-file=.env study.js --models "openai:llama-3.3-70b-versatile,gemini:gemini-2.5-flash" --target northwind --attackers all --trials 3
+node --env-file=.env study.js --models "openai:openai/gpt-oss-120b,gemini:gemini-2.5-flash" --target northwind --attackers all --trials 3
 ```
 
 Only the **agent's** model changes; attackers and judge stay fixed, so the comparison is fair. It
