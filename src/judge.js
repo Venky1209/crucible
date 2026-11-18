@@ -104,9 +104,10 @@ async function judgeOnce(turns, adversary, temperature, policy = null) {
   // A reasoning model can spend its whole budget thinking on a long transcript. Retry once with
   // less thinking and more room; if that fails too, the conversation is UNJUDGED, never a silent pass.
   let raw;
-  try { raw = await ask({}); } catch { raw = null; }
+  try { raw = await ask({}); } catch (e) { if (e.daily) throw e; raw = null; }
   if (raw === null) {
     try { raw = await ask({ maxTokens: 2400, reasoning: 'low' }); } catch (e) {
+      if (e.daily) throw e;
       return { failed: false, unjudged: true, mode: null, evidence: null, why: `Judge call failed: ${e.message.slice(0, 160)}` };
     }
   }

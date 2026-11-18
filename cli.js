@@ -77,7 +77,9 @@ console.log(`crucible · ${targetName} · ${team.length} attackers × ${trials} 
 let done = 0;
 const total = team.length * trials;
 let gaps = [];
-const results = await runAll(team, target, {
+let results;
+try {
+results = await runAll(team, target, {
   trials, turns, votes, ctx: flag('no-recon') ? { recon: false } : {},
   onEvent: (e) => {
     if (e.type === 'recon') { gaps = e.gaps; console.log(`\nPolicy weak points the attackers will lean on (${gaps.length}):`); gaps.forEach((g) => console.log(`  [${g.type}] "${g.quote.slice(0, 90)}"`)); console.log(''); return; }
@@ -87,6 +89,13 @@ const results = await runAll(team, target, {
     process.stdout.write(`  [${done}/${total}] ${a?.name} trial ${e.trial}: ${e.verdict.failed ? 'BROKE IT (' + e.verdict.mode + ')' : 'held'}\n`);
   },
 });
+} catch (e) {
+  if (!e.daily) throw e;
+  console.error(`
+Stopped: ${e.message}
+Nothing was written. Run again when the limit resets, or put that role on another model (ATTACKER_MODEL, TARGET_MODEL, JUDGE_MODEL).`);
+  process.exit(3);
+}
 
 if (target.mode === 'browser') await (await import('./src/browser-target.js')).closeBrowser();
 const summary = summarize(results);

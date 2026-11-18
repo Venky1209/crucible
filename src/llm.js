@@ -241,13 +241,23 @@ export async function chat(messages, { system, maxTokens = 700, temperature = 0.
     await takeSlot(useModel);
     const { url, headers, body } = a.build(messages, system, useModel, maxTokens, temperature, reasoning);
     try {
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      // A stalled connection must fail and retry, not hang the run: one request once froze a baseline for 40 minutes.
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(Number(process.env.LLM_TIMEOUT_MS || 90000)) });
       captureLimits(res);
       noteTokenBudget(useModel);
       if (res.status === 429 || res.status >= 500) {
-        const retryAfter = Number(res.headers.get('retry-after')) * 1000;
-        lastErr = new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-        await sleep(retryAfter || 1500 * 2 ** attempt);
+        const text = await res.text();
+        // A DAILY cap does not lift in seconds. Waiting it out looks exactly like a hang (a baseline once
+        // slept 20 minutes on one), so stop the run and say which model and when it resets.
+        if (res.status === 429 && /per day|\(TPD\)|\(RPD\)/i.test(text)) {
+          const msg = (text.match(/"message":"([^"]+)/) || [])[1] || text.slice(0, 300);
+          throw Object.assign(new Error(`Daily limit reached for ${useModel}. ${msg}`), { fatal: true, daily: true });
+        }
+        const retryAfter = Math.min(Number(res.headers.get('retry-after')) * 1000 || 0, 120000);
+        const waitMs = retryAfter || 1500 * 2 ** attempt;
+        if (waitMs > 10000) console.error(`[crucible] ${useModel} is rate limited, waiting ${Math.round(waitMs / 1000)}s`);
+        lastErr = new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+        await sleep(waitMs);
         continue;
       }
       // 4xx other than 429 is our mistake - bad model, bad key, bad body. Do not burn retries.
@@ -266,6 +276,7 @@ export async function chat(messages, { system, maxTokens = 700, temperature = 0.
       await sleep(1500 * 2 ** attempt);
     }
   }
+  if (lastErr?.daily) throw lastErr;
   throw new Error(`LLM call failed after 5 attempts: ${lastErr?.message}`);
 }
 

@@ -38,6 +38,8 @@ export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, o
     if (conv?.handover) { onEvent({ type: 'handover', adversaryId: adversary.id, trial }); break; }
   }
   } catch (e) {
+    // A daily cap ends the whole run: every later conversation would fail the same way.
+    if (e.daily) throw e;
     // One failed model call ends THIS conversation, not the whole run. It is reported as unjudged.
     error = e.message.slice(0, 200);
   } finally {
