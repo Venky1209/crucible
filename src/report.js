@@ -15,6 +15,12 @@ export function toJson(meta, summary, results) {
       transcript: r.transcript,
     })),
     policyGaps: meta.recon || [],
+    // Every conversation, held or broken, so a person can audit the judge in both directions.
+    conversations: results.map((r) => ({
+      attacker: r.adversary.id, trial: r.trial, failed: !!r.verdict.failed, unjudged: !!r.verdict.unjudged,
+      mode: r.verdict.mode || null, why: r.verdict.why || '', error: r.verdict.error || null, transcript: r.transcript,
+    })),
+    roles: meta.roles || null,
     usage: meta.usage,
   };
 }

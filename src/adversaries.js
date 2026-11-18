@@ -319,6 +319,6 @@ export async function adversaryReply(adversary, transcript, ctx = {}) {
     temperature: 1.0,
     // Indic attacks route to Sarvam; falls back automatically if no key is set.
     provider: adversary.provider,
-    model: adversary.model,
+    model: adversary.model || process.env.ATTACKER_MODEL || undefined,
   });
 }

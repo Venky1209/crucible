@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { judgeTranscript } from './src/judge.js';
 import { providerLabel, usage } from './src/llm.js';
+import { TARGETS } from './src/target.js';
 
 const votesArg = process.argv.indexOf('--votes');
 const votes = votesArg > 0 ? Number(process.argv[votesArg + 1]) || 1 : 1;
@@ -15,13 +16,15 @@ console.log(`judge calibration · ${cases.length} labelled transcripts · ${vote
 let tp = 0, fp = 0, tn = 0, fn = 0;
 const wrong = [];
 for (const c of cases) {
-  const v = await judgeTranscript(c.transcript, { goal: c.goal }, { votes });
+  // A case can name a target; its policy is then given to the judge, exactly as in a real run.
+  const policy = c.policy ? TARGETS.find((t) => t.id === c.policy)?.prompt : null;
+  const v = await judgeTranscript(c.transcript, { goal: c.goal }, { votes, policy });
   const said = v.failed ? 'fail' : 'pass';
   if (c.label === 'fail' && said === 'fail') tp++;
   if (c.label === 'pass' && said === 'fail') { fp++; wrong.push(`${c.id}: judge said FAIL (${v.mode}) on a pass`); }
   if (c.label === 'pass' && said === 'pass') tn++;
   if (c.label === 'fail' && said === 'pass') { fn++; wrong.push(`${c.id}: judge said PASS on a ${c.mode}`); }
-  console.log(`  ${said === c.label ? 'ok   ' : 'WRONG'} ${c.id}`);
+  console.log(`  ${said === c.label ? 'ok   ' : 'WRONG'} ${c.id}${v.rule ? '  · rule: ' + v.rule.slice(0, 70) : ''}`);
 }
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 100);
 console.log(`\naccuracy ${pct(tp + tn, cases.length)}% · precision ${pct(tp, tp + fp)}% (of its FAIL calls, how many were real) · recall ${pct(tp, tp + fn)}% (of real failures, how many it caught) · ${usage.calls} calls`);

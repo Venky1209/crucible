@@ -42,8 +42,9 @@ export function analyzePolicy(policy) {
     let raw;
     try {
       raw = await chat([{ role: 'user', content: `POLICY:\n${policy}\n\nList the gaps. JSON only.` }],
-        { system: RECON_SYSTEM, maxTokens: 1400, temperature: 0.2 });
-    } catch { return []; }
+        { system: RECON_SYSTEM, maxTokens: 3000, temperature: 0.2, reasoning: 'low', model: process.env.JUDGE_MODEL || undefined });
+    } catch (e) { if (process.env.CRUCIBLE_DEBUG) console.error('[recon] call failed:', e.message); return []; }
+    if (process.env.CRUCIBLE_DEBUG) console.error('[recon] raw:', raw.slice(0, 1500));
     let j; try { j = extractJson(raw); } catch { return []; }
     const hay = norm(policy);
     return (Array.isArray(j.gaps) ? j.gaps : [])

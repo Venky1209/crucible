@@ -130,7 +130,7 @@ const ADAPTERS = {
     listUrl() { return `${this.base()}/models`; },
     listHeaders: () => ({ authorization: `Bearer ${keyFor(ADAPTERS.openai)}` }),
     listExtract: (d) => (d.data || []).map((m) => m.id),
-    build(messages, system, model, maxTokens, temperature) {
+    build(messages, system, model, maxTokens, temperature, reasoning) {
       return {
         url: `${this.base()}/chat/completions`,
         headers: { authorization: `Bearer ${keyFor(ADAPTERS.openai)}`, 'content-type': 'application/json' },
@@ -139,6 +139,9 @@ const ADAPTERS = {
           max_tokens: maxTokens,
           temperature,
           messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+          // Reasoning models (gpt-oss) spend hidden tokens before answering; long structured
+          // outputs can run out of budget. Callers that need a long answer ask for less thinking.
+          ...(reasoning && /gpt-oss/.test(model) ? { reasoning_effort: reasoning } : {}),
         },
       };
     },
@@ -188,8 +191,10 @@ export function providerReady(name) {
 // RPM as a floor AND back off on the provider's own remaining-tokens header.
 // Guessing a fixed rate is what puts a 429 on camera.
 const minGapMs = Math.ceil(60000 / RPM);
-let nextSlot = 0;
-let tokenHoldUntil = 0;
+// Groq (and most providers) limit each MODEL separately, so pace each model on its own clock.
+// One run can then put the attackers, the agent and the judge on three models and use three budgets.
+const pace = new Map();
+const paceOf = (m) => { if (!pace.has(m)) pace.set(m, { nextSlot: 0, holdUntil: 0 }); return pace.get(m); };
 
 const parseReset = (v) => {
   if (!v) return 0;
@@ -198,28 +203,30 @@ const parseReset = (v) => {
   return (Number(m[1] || 0) * 60 + Number(m[2] || 0)) * 1000;
 };
 
-function noteTokenBudget() {
+function noteTokenBudget(model) {
   const remaining = Number(limits['remaining-tokens']);
   if (!Number.isFinite(remaining)) return;
   // Below roughly two calls' worth, wait out the window rather than 429.
   if (remaining < 1800) {
+    const p = paceOf(model);
     const waitMs = parseReset(limits['reset-tokens']) + 500;
-    tokenHoldUntil = Math.max(tokenHoldUntil, Date.now() + Math.min(waitMs, 65000));
+    p.holdUntil = Math.max(p.holdUntil, Date.now() + Math.min(waitMs, 65000));
   }
 }
 
-async function takeSlot() {
-  if (tokenHoldUntil > Date.now()) {
-    await sleep(tokenHoldUntil - Date.now());
-    tokenHoldUntil = 0;
+async function takeSlot(model) {
+  const p = paceOf(model);
+  if (p.holdUntil > Date.now()) {
+    await sleep(p.holdUntil - Date.now());
+    p.holdUntil = 0;
   }
   const now = Date.now();
-  const slot = Math.max(now, nextSlot);
-  nextSlot = slot + minGapMs;
+  const slot = Math.max(now, p.nextSlot);
+  p.nextSlot = slot + minGapMs;
   if (slot > now) await sleep(slot - now);
 }
 
-export async function chat(messages, { system, maxTokens = 700, temperature = 0.9, model, provider } = {}) {
+export async function chat(messages, { system, maxTokens = 700, temperature = 0.9, model, provider, reasoning } = {}) {
   const ctx = ctxOf();
   const main = ctx.provider || PROVIDER;
   if (main === 'mock') { usage.calls++; return mockReply(messages, system); }
@@ -231,12 +238,12 @@ export async function chat(messages, { system, maxTokens = 700, temperature = 0.
   let lastErr;
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    await takeSlot();
-    const { url, headers, body } = a.build(messages, system, useModel, maxTokens, temperature);
+    await takeSlot(useModel);
+    const { url, headers, body } = a.build(messages, system, useModel, maxTokens, temperature, reasoning);
     try {
       const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
       captureLimits(res);
-      noteTokenBudget();
+      noteTokenBudget(useModel);
       if (res.status === 429 || res.status >= 500) {
         const retryAfter = Number(res.headers.get('retry-after')) * 1000;
         lastErr = new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);

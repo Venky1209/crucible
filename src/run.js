@@ -22,6 +22,7 @@ export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, o
     conv = await openBrowserConversation(target);
     onEvent({ type: 'browser', adversaryId: adversary.id, trial, via: conv.via });
   }
+  let error = null;
   try {
   for (let i = 0; i < turns; i++) {
     const attack = await adversaryReply(adversary, transcript, ctx);
@@ -36,11 +37,17 @@ export async function runAttack(adversary, target, { turns = TURNS_PER_ATTACK, o
     // A real person may now be on the other end. Stop: red-team traffic must never reach support staff.
     if (conv?.handover) { onEvent({ type: 'handover', adversaryId: adversary.id, trial }); break; }
   }
+  } catch (e) {
+    // One failed model call ends THIS conversation, not the whole run. It is reported as unjudged.
+    error = e.message.slice(0, 200);
   } finally {
     await conv?.close();
   }
 
-  const verdict = await judgeTranscript(transcript, adversary, { votes, policy: ctx.policy || null });
+  const verdict = error && transcript.length < 2
+    ? { failed: false, unjudged: true, mode: null, evidence: null, why: `Conversation could not run: ${error}` }
+    : await judgeTranscript(transcript, adversary, { votes, policy: ctx.policy || null });
+  if (error) verdict.error = error;
   if (conv?.handover) verdict.handover = true;
   onEvent({ type: 'verdict', adversaryId: adversary.id, verdict, trial });
   return { adversary, transcript, verdict, trial };

@@ -90,8 +90,8 @@ const results = await runAll(team, target, {
 
 if (target.mode === 'browser') await (await import('./src/browser-target.js')).closeBrowser();
 const summary = summarize(results);
-const meta = { recon: gaps, version: '2.0.0', when: new Date().toISOString().slice(0, 16).replace('T', ' '), target: targetName, model: providerLabel(), trials, turns, votes, usage };
-console.log(`\nResistance ${summary.resistance}/100 · attack success ${summary.asr}% (95% CI ${summary.ci[0]}–${summary.ci[1]}%) · pass^${summary.passK.k} ${summary.passK.value}% · ${usage.calls} model calls`);
+const meta = { version: '2.0.0', when: new Date().toISOString().slice(0, 16).replace('T', ' '), target: targetName, model: providerLabel(), roles: { attacker: process.env.ATTACKER_MODEL || null, agent: process.env.TARGET_MODEL || null, judge: process.env.JUDGE_MODEL || null }, recon: gaps, trials, turns, votes, usage };
+console.log(`\nResistance ${summary.resistance}/100 · attack success ${summary.asr}% (95% CI ${summary.ci[0]}–${summary.ci[1]}%) · pass^${summary.passK.k} ${summary.passK.value}% · ${usage.calls} model calls${summary.unjudged ? ` · ${summary.unjudged} conversation(s) unjudged, left out of the rates` : ''}`);
 for (const a of summary.attackers) console.log(`  ${a.name.padEnd(22)} ${String(a.failures).padStart(2)}/${a.trials}  ${String(a.asr).padStart(5)}%  CI ${a.ci[0]}–${a.ci[1]}%`);
 
 const out = opt('out');

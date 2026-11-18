@@ -141,5 +141,5 @@ export async function targetReply(target, history) {
     return llmContext.run({ provider: target.provider, model: target.model, key: target.key, base: target.base },
       () => chat(history, { system, maxTokens: 800, temperature: 0.7 }));
   }
-  return chat(history, { system, maxTokens: 800, temperature: 0.7, model: target?.model });
+  return chat(history, { system, maxTokens: 800, temperature: 0.7, model: target?.model || process.env.TARGET_MODEL || undefined });
 }
